@@ -1,0 +1,36 @@
+# local deps / caches
+_pydeps/
+__pycache__/
+*.pyc
+.venv/
+
+# debug / probe / runtime artifacts
+_*.txt
+_*.json
+_*.jsonl
+_*.log
+_http_access.log
+_http_server.txt
+_runtime_*
+_iterate_*
+_reinstall_*
+_auto_install_log.txt
+_cdp*.txt
+_edge_debug_launch.txt
+_launch*.txt
+_ping_*.txt
+_ports.txt
+_mods.txt
+_bc3.txt
+_find.txt
+_api_probe.txt
+_debug_server.txt
+_serve_check.txt
+_repr.txt
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

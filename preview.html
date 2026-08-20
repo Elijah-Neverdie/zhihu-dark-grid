@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>知乎暗色网格 · 布局预览</title>
+  <style>
+    :root {
+      --zh-bg: #0b0f1b;
+      --zh-bg-elevated: #121826;
+      --zh-card: #1a1f2c;
+      --zh-card-hover: #222938;
+      --zh-border: rgba(255, 255, 255, 0.06);
+      --zh-text: #f2f5fa;
+      --zh-text-secondary: #9aa3b5;
+      --zh-text-muted: #6b7385;
+      --zh-accent: #2f6bff;
+      --zh-radius: 12px;
+      --zh-max: 1480px;
+      --zh-sidebar: 300px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--zh-bg);
+      color: var(--zh-text);
+    }
+    a { color: inherit; text-decoration: none; }
+    .header {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; gap: 20px;
+      height: 56px; padding: 0 20px;
+      max-width: var(--zh-max); margin: 0 auto;
+      background: rgba(11, 15, 27, 0.92);
+      border-bottom: 1px solid var(--zh-border);
+      backdrop-filter: blur(12px);
+    }
+    .tabs { display: flex; gap: 18px; font-size: 14px; color: var(--zh-text-secondary); }
+    .tabs .active { color: var(--zh-text); position: relative; }
+    .tabs .active::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -16px;
+      height: 2px; background: var(--zh-accent); border-radius: 2px;
+    }
+    .search {
+      flex: 1; max-width: 420px; margin: 0 auto;
+      height: 36px; border-radius: 999px; padding: 0 16px;
+      background: var(--zh-bg-elevated); border: 1px solid var(--zh-border);
+      color: var(--zh-text-muted); font-size: 13px;
+      display: flex; align-items: center;
+    }
+    .header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+    .btn-create {
+      background: var(--zh-accent); color: #fff; border: 0;
+      border-radius: 10px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+    }
+    .avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, #4568ff, #8ab4ff);
+    }
+    .actions {
+      max-width: var(--zh-max); margin: 12px auto 0; padding: 0 20px;
+      display: flex; gap: 10px; flex-wrap: wrap;
+    }
+    .actions a {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 16px; background: var(--zh-card);
+      border: 1px solid var(--zh-border); border-radius: 12px; font-size: 14px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .layout {
+      max-width: var(--zh-max); margin: 16px auto 40px; padding: 0 20px;
+      display: flex; gap: 16px; align-items: flex-start;
+    }
+    .feed {
+      flex: 1; min-width: 0;
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;
+    }
+    .card {
+      background: var(--zh-card); border: 1px solid var(--zh-border);
+      border-radius: var(--zh-radius); padding: 14px;
+      display: flex; flex-direction: column; min-height: 280px;
+    }
+    .card h3 {
+      margin: 0 0 10px; font-size: 15px; line-height: 1.45;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .media {
+      aspect-ratio: 16/10; border-radius: 10px; overflow: hidden;
+      background: #0f1522; margin-bottom: 10px;
+    }
+    .media.quote {
+      background: #f4f6fb; color: #1a1f2c; padding: 16px;
+      display: flex; align-items: center; font-size: 13px; line-height: 1.5;
+    }
+    .media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .excerpt {
+      margin: 0 0 12px; font-size: 13px; line-height: 1.55; color: var(--zh-text-secondary);
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .footer {
+      margin-top: auto; display: flex; gap: 14px; align-items: center;
+      color: var(--zh-text-muted); font-size: 12px;
+    }
+    .footer .more { margin-left: auto; }
+    .sidebar { width: var(--zh-sidebar); flex: none; display: flex; flex-direction: column; gap: 12px; }
+    .widget {
+      background: var(--zh-card); border: 1px solid var(--zh-border);
+      border-radius: var(--zh-radius); padding: 14px;
+    }
+    .widget h4 { margin: 0 0 12px; font-size: 15px; }
+    .banner {
+      height: 72px; border-radius: 10px; margin-bottom: 10px;
+      background: linear-gradient(120deg, #1b3a7a, #2f6bff 55%, #6ea0ff);
+    }
+    .stack { display: flex; flex-direction: column; gap: 8px; }
+    .stack .btn {
+      height: 36px; border-radius: 8px; border: 0; cursor: pointer; font-size: 13px;
+    }
+    .stack .primary { background: var(--zh-accent); color: #fff; }
+    .stack .ghost { background: var(--zh-bg-elevated); color: var(--zh-text-secondary); border: 1px solid var(--zh-border); }
+    .hot-item {
+      display: flex; gap: 8px; padding: 8px 0; font-size: 13px; color: var(--zh-text-secondary);
+      border-bottom: 1px solid var(--zh-border);
+    }
+    .hot-item:last-child { border-bottom: 0; }
+    .num { width: 18px; color: var(--zh-text-muted); font-weight: 700; }
+    .num.top { color: #f87171; }
+    .follow {
+      display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    }
+    .follow .avatar { width: 36px; height: 36px; }
+    .follow .meta { flex: 1; min-width: 0; }
+    .follow .name { font-size: 13px; }
+    .follow .desc { font-size: 12px; color: var(--zh-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .follow button {
+      border: 0; background: var(--zh-accent); color: #fff;
+      border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer;
+    }
+    .guess { max-width: var(--zh-max); margin: 0 auto 48px; padding: 0 20px; }
+    .guess h2 { font-size: 16px; margin: 0 0 12px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tags span {
+      padding: 7px 14px; border-radius: 999px; font-size: 13px;
+      background: var(--zh-card); border: 1px solid var(--zh-border); color: var(--zh-text-secondary);
+    }
+    @media (max-width: 1280px) { .feed { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 960px) {
+      .layout { flex-direction: column; }
+      .sidebar { width: 100%; }
+      .feed { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <nav class="tabs">
+      <a href="#">关注</a>
+      <a class="active" href="#">推荐</a>
+      <a href="#">热榜</a>
+      <a href="#">专栏</a>
+      <a href="#">圈子</a>
+      <a href="#">故事</a>
+    </nav>
+    <div class="search">搜索你感兴趣的内容...</div>
+    <div class="header-right">
+      <button class="btn-create">＋ 创作</button>
+      <div class="avatar" title="通知"></div>
+    </div>
+  </header>
+
+  <nav class="actions">
+    <a href="#"><span class="dot" style="background:#2dd4bf"></span>提问</a>
+    <a href="#"><span class="dot" style="background:#60a5fa"></span>回答</a>
+    <a href="#"><span class="dot" style="background:#fb923c"></span>写文章</a>
+    <a href="#"><span class="dot" style="background:#f472b6"></span>发想法</a>
+    <a href="#"><span class="dot" style="background:#a78bfa"></span>发视频</a>
+  </nav>
+
+  <main class="layout">
+    <section class="feed" id="feed"></section>
+    <aside class="sidebar">
+      <div class="widget">
+        <h4>创作中心 · Lv5</h4>
+        <div class="banner"></div>
+        <div class="stack">
+          <button class="btn primary">进入创作中心</button>
+          <button class="btn ghost">等待收录</button>
+        </div>
+      </div>
+      <div class="widget">
+        <h4>热门榜单</h4>
+        <div id="hot"></div>
+        <button class="btn ghost" style="width:100%;margin-top:8px;height:36px;border-radius:8px;border:1px solid var(--zh-border);background:var(--zh-bg-elevated);color:var(--zh-text-secondary);">查看完整榜单</button>
+      </div>
+      <div class="widget">
+        <h4>推荐关注</h4>
+        <div id="follows"></div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="guess">
+    <h2>猜你想看</h2>
+    <div class="tags">
+      <span>职场</span><span>情感</span><span>科技</span><span>心理</span>
+      <span>AI</span><span>商业</span><span>教育</span><span>历史</span>
+    </div>
+  </section>
+
+  <script>
+    const cards = [
+      { title: "为什么很多人开始重新评估「远程办公」的真实收益？", excerpt: "表面上是通勤时间被省下了，但协作成本、上下文切换和职业能见度往往被低估……", img: "https://picsum.photos/seed/zh1/640/400", votes: "1.2 万赞同", comments: "328 评论" },
+      { title: "一份能长期复用的个人知识库，到底应该长什么样？", excerpt: "工具不是重点，检索路径、标签粒度和回顾节奏才是。", quote: true, votes: "860 赞同", comments: "96 评论" },
+      { title: "城市夜景摄影：低光下如何保住细节又不把噪点拉爆", excerpt: "ISO、快门与后期降噪的取舍，比「堆器材」更重要。", img: "https://picsum.photos/seed/zh2/640/400", votes: "2.4 万赞同", comments: "501 评论" },
+      { title: "把复杂产品讲清楚：我常用的三层叙事模板", excerpt: "先给结论，再给边界，最后才展开实现细节。", img: "https://picsum.photos/seed/zh3/640/400", votes: "670 赞同", comments: "44 评论" },
+      { title: "AI 辅助写作会不会让表达同质化？", excerpt: "模型擅长平均答案；差异化来自你的取舍与现场经验。", img: "https://picsum.photos/seed/zh4/640/400", votes: "3.1 万赞同", comments: "812 评论" },
+      { title: "创业早期最容易被忽视的现金流细节", excerpt: "不是融资节奏，而是回款周期、押金与渠道账期。", img: "https://picsum.photos/seed/zh5/640/400", votes: "990 赞同", comments: "120 评论" },
+      { title: "读史时如何避免「用今天的标准审判古人」", excerpt: "先还原约束条件，再评价选择，而不是反过来。", quote: true, votes: "1.5 万赞同", comments: "233 评论" },
+      { title: "健身三个月后平台期，该加量还是换动作？", excerpt: "多数情况下是恢复不足，而不是计划本身失效。", img: "https://picsum.photos/seed/zh6/640/400", votes: "540 赞同", comments: "77 评论" },
+    ];
+
+    const feed = document.getElementById("feed");
+    feed.innerHTML = cards.map((c) => `
+      <article class="card">
+        <h3>${c.title}</h3>
+        <div class="media ${c.quote ? "quote" : ""}">
+          ${c.quote ? c.excerpt : `<img src="${c.img}" alt="" />`}
+        </div>
+        ${c.quote ? "" : `<p class="excerpt">${c.excerpt}</p>`}
+        <div class="footer"><span>${c.votes}</span><span>${c.comments}</span><span class="more">···</span></div>
+      </article>
+    `).join("");
+
+    const hot = document.getElementById("hot");
+    const hotTitles = ["周末加班该不该回复工作消息", "新一代显示器怎么选", "本地生活大战又起", "本科毕业论文选题避坑", "咖啡因耐受与睡眠", "开源模型部署成本", "城市更新里的街区记忆", "长期主义投资入门"];
+    hot.innerHTML = hotTitles.map((t, i) => `
+      <div class="hot-item"><span class="num ${i < 3 ? "top" : ""}">${i + 1}</span><span>${t}</span></div>
+    `).join("");
+
+    const follows = document.getElementById("follows");
+    ["产品观察室", "城市影像笔记", "算法边角料"].forEach((name) => {
+      follows.innerHTML += `
+        <div class="follow">
+          <div class="avatar"></div>
+          <div class="meta"><div class="name">${name}</div><div class="desc">持续更新有启发的内容</div></div>
+          <button>+ 关注</button>
+        </div>`;
+    });
+  </script>
+</body>
+</html>
