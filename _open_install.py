@@ -19,5 +19,5 @@ except Exception as e:
     print("OK after start", r.status)
 
 # open edge
-subprocess.Popen(["cmd", "/c", "start", "msedge", url + "?v=325"], shell=False)
+subprocess.Popen(["cmd", "/c", "start", "msedge", url + "?v=335"], shell=False)
 print("opened edge")

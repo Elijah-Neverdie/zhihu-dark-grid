@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/local/zhihu-dark-grid
-// @version      3.2.5
-// @description  暗色深灰瀑布流：按原始顺序分列、无空隙、藏图不换列
+// @version      3.3.5
+// @description  暗色深灰瀑布流：删除头像遮挡方块
 // @author       local
 // @match        https://www.zhihu.com/*
 // @run-at       document-start
@@ -177,12 +177,15 @@ body.zh-dg-v2{
 }
 body.zh-dg-v2 .AppHeader,body.zh-dg-v2 header[role=banner]{
   background:rgba(20,20,20,.96)!important;border-bottom:1px solid var(--dg-line)!important;box-shadow:none!important;
-  width:100%!important;max-width:none!important
+  width:100%!important;max-width:none!important;
+  position:sticky!important;top:0!important;z-index:10050!important;
+  pointer-events:auto!important;isolation:isolate!important;transform:translateZ(0)
 }
 body.zh-dg-v2 .AppHeader-inner,
 body.zh-dg-v2 .AppHeader > div,
 body.zh-dg-v2 header[role=banner] > div{
-  max-width:none!important;width:100%!important;margin:0!important;padding-left:20px!important;padding-right:20px!important;box-sizing:border-box!important
+  max-width:none!important;width:100%!important;margin:0!important;padding-left:20px!important;padding-right:20px!important;box-sizing:border-box!important;
+  pointer-events:auto!important;position:relative!important;z-index:1!important
 }
 /* 移除左上角「知乎」字样 / Logo（不要误伤带 svg 的其它入口） */
 body.zh-dg-v2 .AppHeader-logo,
@@ -191,6 +194,54 @@ body.zh-dg-v2 .AppHeader .ZhihuLogo,
 body.zh-dg-v2 .AppHeader a[aria-label="知乎"],
 body.zh-dg-v2 .AppHeader a[aria-label="知乎首页"],
 body.zh-dg-v2 .zh-dg-hide-logo{display:none!important}
+/* 移除顶栏「直答」入口 */
+body.zh-dg-v2 .zh-dg-hide-zhida,
+body.zh-dg-v2 .AppHeader a[href*="zhida.zhihu.com"],
+body.zh-dg-v2 .AppHeader a[href*="zhida.ai"],
+body.zh-dg-v2 header[role=banner] a[href*="zhida.zhihu.com"],
+body.zh-dg-v2 header[role=banner] a[href*="zhida.ai"]{
+  display:none!important;visibility:hidden!important;pointer-events:none!important;
+  width:0!important;height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;border:0!important
+}
+/* 确保头像 / 个人入口可点；去掉误加在头像上的方块底 */
+body.zh-dg-v2 .AppHeader .AppHeader-profileEntry,
+body.zh-dg-v2 .AppHeader .AppHeader-userInfo,
+body.zh-dg-v2 .AppHeader .AppHeader-profile,
+body.zh-dg-v2 .AppHeader button:has(img.Avatar),
+body.zh-dg-v2 .AppHeader a:has(img.Avatar),
+body.zh-dg-v2 .AppHeader .Avatar,
+body.zh-dg-v2 .AppHeader img.Avatar,
+body.zh-dg-v2 header[role=banner] button:has(img.Avatar),
+body.zh-dg-v2 header[role=banner] a:has(img.Avatar){
+  pointer-events:auto!important;cursor:pointer!important;
+  position:relative!important;z-index:20!important;opacity:1!important;visibility:visible!important
+}
+body.zh-dg-v2 .AppHeader button:has(img.Avatar),
+body.zh-dg-v2 .AppHeader a:has(img.Avatar),
+body.zh-dg-v2 .AppHeader .AppHeader-profileEntry,
+body.zh-dg-v2 .AppHeader .AppHeader-profileEntry.Button,
+body.zh-dg-v2 .AppHeader .AppHeader-profileEntry.Button--primary,
+body.zh-dg-v2 .AppHeader .AppHeader-profileEntry.Button--blue,
+body.zh-dg-v2 header[role=banner] button:has(img.Avatar){
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  border-radius:50%!important;padding:0!important;margin:0!important;
+  min-width:0!important;min-height:0!important;width:auto!important;height:auto!important;
+  overflow:visible!important
+}
+body.zh-dg-v2 .AppHeader .Avatar,
+body.zh-dg-v2 .AppHeader img.Avatar,
+body.zh-dg-v2 .AppHeader button:has(img.Avatar) img,
+body.zh-dg-v2 header[role=banner] img.Avatar{
+  border-radius:50%!important;width:32px!important;height:32px!important;
+  object-fit:cover!important;display:block!important;
+  max-width:32px!important;max-height:32px!important;
+  background:transparent!important;box-shadow:none!important
+}
+/* 顶栏内 Popover 包装勿盖住头像；打开的菜单仍浮在上面 */
+body.zh-dg-v2 .AppHeader .Popover{z-index:auto!important;position:relative!important}
+body.zh-dg-v2 .AppHeader .Popover-content{
+  z-index:300001!important
+}
 /* 恢复顶栏消息/私信等 SVG、图标可见性（深色主题下原 fill 常变成「消失」） */
 body.zh-dg-v2 .AppHeader svg,
 body.zh-dg-v2 header[role=banner] svg{
@@ -210,19 +261,76 @@ body.zh-dg-v2 .AppHeader .Zi,
 body.zh-dg-v2 .AppHeader [class*="Icon"]{
   color:#d4d4d4!important;opacity:1!important;visibility:visible!important
 }
+/* 隐藏私信未读角标（数字 + 红圈）；不依赖不稳定的 hash 类名 */
+.Messages-count,
+.css-ybodb,
+.zh-dg-hide-msg-badge,
+body.zh-dg-v2 .Messages-count,
+body.zh-dg-v2 .zh-dg-hide-msg-badge{
+  display:none!important;visibility:hidden!important;opacity:0!important;
+  width:0!important;height:0!important;min-width:0!important;max-width:0!important;
+  padding:0!important;margin:0!important;overflow:hidden!important;font-size:0!important;
+  border:0!important;pointer-events:none!important
+}
+/* 常见伪元素角标 */
+a[href*="/messages"]::before,
+a[href*="/messages"]::after,
+button[aria-label*="私信"]::before,
+button[aria-label*="私信"]::after{content:none!important;display:none!important}
 #zh-dg-actions,#zh-dg-guess{display:none!important}
 body.zh-dg-v2 .SearchBar-input,body.zh-dg-v2 .SearchBar input{
   background:var(--dg-elev)!important;border:1px solid var(--dg-line)!important;border-radius:999px!important;color:var(--dg-text)!important;box-shadow:none!important
 }
+/* 搜索框与右侧「+」留出间距 */
+body.zh-dg-v2 .AppHeader .SearchBar,
+body.zh-dg-v2 header[role=banner] .SearchBar{
+  margin-right:18px!important
+}
+body.zh-dg-v2 .AppHeader .SearchBar + *,
+body.zh-dg-v2 header[role=banner] .SearchBar + *{
+  margin-left:4px!important
+}
 body.zh-dg-v2 .Button--primary,body.zh-dg-v2 .Button--blue{
   background:#3a3a3a!important;border-color:#4a4a4a!important;color:#fff!important;border-radius:10px!important
 }
+/* 顶栏提问「+」不要被撑成大方块，且与搜索拉开 */
+body.zh-dg-v2 .AppHeader .Button--primary:has(svg):not(:has(img.Avatar)),
+body.zh-dg-v2 .AppHeader .Button--blue:has(svg):not(:has(img.Avatar)),
+body.zh-dg-v2 .AppHeader button[aria-label*="提问"],
+body.zh-dg-v2 .AppHeader a[aria-label*="提问"],
+body.zh-dg-v2 .AppHeader .AskButton,
+body.zh-dg-v2 .AppHeader [class*="AskQuestion"]{
+  margin-left:12px!important;flex-shrink:0!important;
+  width:34px!important;height:34px!important;min-width:34px!important;
+  padding:0!important;border-radius:50%!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important
+}
+/* 原站信息流移出文档流，禁止再撑出整页高度 */
 body.zh-dg-v2 .Topstory-container,body.zh-dg-v2 .GlobalSideBar,body.zh-dg-v2 .Topstory-sideBar,
-body.zh-dg-v2 .Footer,body.zh-dg-v2 footer,body.zh-dg-v2 .CornerButtons,body.zh-dg-v2 .Adboard{display:none!important}
-#zh-dg-scraper{position:fixed!important;left:-10000px!important;top:0!important;width:860px!important;height:80vh!important;overflow:auto!important;opacity:0!important;pointer-events:none!important;z-index:-1!important}
-#zh-dg-scraper .Topstory-container,#zh-dg-scraper .Card,#zh-dg-scraper .Topstory-recommend,#zh-dg-scraper .GlobalSideBar{display:block!important;position:static!important;opacity:1!important;height:auto!important;width:auto!important}
-#zh-dg-shell{max-width:var(--dg-max);margin:12px auto 64px;padding:0 20px 100px;display:grid;grid-template-columns:minmax(0,1fr) var(--dg-side);gap:16px;align-items:start;box-sizing:border-box}
-#zh-dg-main{min-width:0}
+body.zh-dg-v2 .Footer,body.zh-dg-v2 footer,body.zh-dg-v2 .CornerButtons,body.zh-dg-v2 .Adboard,
+body.zh-dg-v2 .Topstory,body.zh-dg-v2 .Topstory-mainColumn,body.zh-dg-v2 .TopstoryMain,
+body.zh-dg-v2 .App-main > :not(#zh-dg-shell){
+  position:fixed!important;left:-10000px!important;top:0!important;width:1px!important;height:1px!important;
+  max-height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;
+  margin:0!important;padding:0!important;border:0!important
+}
+body.zh-dg-v2 #root,body.zh-dg-v2 .App,body.zh-dg-v2 .App-main,body.zh-dg-v2 .App-mainColumn{
+  min-height:0!important;height:auto!important;max-height:none!important
+}
+/* 抓取容器：零尺寸，避免内部原站 DOM 把页面撑高 */
+#zh-dg-scraper{
+  position:fixed!important;left:0!important;top:0!important;width:0!important;height:0!important;
+  overflow:hidden!important;opacity:0!important;pointer-events:none!important;z-index:-1!important;
+  contain:strict!important;margin:0!important;padding:0!important;border:0!important
+}
+#zh-dg-scraper *{pointer-events:none!important}
+/* 主区全宽；侧栏固定在右侧，滚到底不会变成「掉在空白里」 */
+#zh-dg-shell{
+  max-width:var(--dg-max);margin:12px auto 48px;padding:0 20px 48px;
+  display:block;box-sizing:border-box;
+  padding-right:calc(var(--dg-side) + 36px)
+}
+#zh-dg-main{min-width:0;width:100%}
 #zh-dg-status{color:var(--dg-mute);font-size:12px;margin-bottom:8px;min-height:18px}
 /* 按原始顺序从左到右分列；同列内上下紧贴，藏图只收高度、不换列 */
 #zh-dg-grid,.zh-dg-skel{
@@ -234,7 +342,7 @@ body.zh-dg-v2 .Footer,body.zh-dg-v2 footer,body.zh-dg-v2 .CornerButtons,body.zh-
 .zh-dg-card{
   display:block;width:100%;margin:0;min-width:0;
   background:var(--dg-card);border:1px solid var(--dg-line);border-radius:14px;
-  overflow:hidden;box-sizing:border-box;transition:border-color .15s ease;
+  overflow:visible;box-sizing:border-box;transition:border-color .15s ease;
 }
 .zh-dg-card:hover{border-color:rgba(255,255,255,.22)}
 .zh-dg-card.is-expanded{border-color:rgba(255,255,255,.35)}
@@ -285,6 +393,110 @@ body.zh-dg-v2 .Footer,body.zh-dg-v2 footer,body.zh-dg-v2 .CornerButtons,body.zh-
 .zh-dg-btnx.is-on{color:#d0d0d0}
 .zh-dg-btnx .ico{color:#c0c0c0}
 .zh-dg-more{margin-left:auto}
+/* 原站操作栏：横向、仅图标；收藏/… 弹出层保持可用 */
+.zh-dg-foot--native{
+  display:block;padding:2px 8px 10px;overflow:visible;position:relative;z-index:5
+}
+.zh-dg-foot--native .ContentItem-actions,
+.zh-dg-foot--native .RichContent-actions{
+  display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
+  align-items:center!important;justify-content:flex-start!important;gap:2px!important;
+  margin:0!important;padding:4px 0!important;border:0!important;border-top:0!important;
+  background:transparent!important;box-shadow:none!important;
+  width:100%!important;max-width:100%!important;
+  position:relative!important;left:auto!important;right:auto!important;bottom:auto!important;top:auto!important;
+  transform:none!important;opacity:1!important;visibility:visible!important;
+  pointer-events:auto!important;height:auto!important;max-height:none!important;
+  float:none!important;inset:auto!important
+}
+.zh-dg-foot--native .ContentItem-actions > *,
+.zh-dg-foot--native .RichContent-actions > *{
+  flex:0 0 auto!important;width:auto!important;max-width:none!important;
+  margin:0!important;float:none!important;
+  opacity:1!important;visibility:visible!important;pointer-events:auto!important;
+  position:relative!important;transform:none!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important
+}
+/* 赞同区内部也保持横排 */
+.zh-dg-foot--native .VoteButtonGroup,
+.zh-dg-foot--native [class*="VoteButton"]{
+  display:inline-flex!important;flex-direction:row!important;align-items:center!important;
+  width:auto!important
+}
+.zh-dg-foot--native button,
+.zh-dg-foot--native .Button,
+.zh-dg-foot--native a,
+.zh-dg-foot--native [role="button"]{
+  color:#8ab4ff!important;background:transparent!important;border:0!important;
+  box-shadow:none!important;pointer-events:auto!important;cursor:pointer!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  gap:0!important;padding:8px!important;margin:0!important;
+  min-width:34px!important;min-height:34px!important;border-radius:8px!important;
+  /* 隐藏中文文案与数字，只留图标 */
+  font-size:0!important;line-height:0!important;letter-spacing:0!important;
+  white-space:nowrap!important;overflow:hidden!important
+}
+.zh-dg-foot--native button:hover,
+.zh-dg-foot--native .Button:hover,
+.zh-dg-foot--native a:hover,
+.zh-dg-foot--native [role="button"]:hover{
+  background:rgba(255,255,255,.08)!important;color:#b4d0ff!important
+}
+.zh-dg-foot--native svg,
+.zh-dg-foot--native .Zi,
+.zh-dg-foot--native [class*="Icon"],
+.zh-dg-foot--native [class*="icon"]{
+  color:#8ab4ff!important;fill:currentColor!important;
+  width:18px!important;height:18px!important;min-width:18px!important;
+  font-size:18px!important;line-height:18px!important;flex-shrink:0!important;
+  display:block!important;opacity:1!important;visibility:visible!important
+}
+.zh-dg-foot--native path{fill:currentColor!important}
+/* 文案节点隐藏（保留 svg / 图标容器） */
+.zh-dg-foot--native button > span:not(:has(svg)):not([class*="Icon"]):not([class*="icon"]):not(.Zi),
+.zh-dg-foot--native .Button > span:not(:has(svg)):not([class*="Icon"]):not([class*="icon"]):not(.Zi),
+.zh-dg-foot--native .Button-label,
+.zh-dg-foot--native .VoteButton-text,
+.zh-dg-foot--native [class*="Button-text"],
+.zh-dg-foot--native [class*="buttonText"]{
+  display:none!important;font-size:0!important;width:0!important;height:0!important;
+  overflow:hidden!important;margin:0!important;padding:0!important
+}
+.zh-dg-foot--native .VoteButton--up.is-active,
+.zh-dg-foot--native .VoteButton--up[aria-pressed="true"],
+.zh-dg-foot--native .is-active{
+  color:#c8dcff!important
+}
+/* 弹出层：收藏夹 / 分享 / 更多菜单（勿用过宽选择器误伤顶栏） */
+body.zh-dg-v2 .Modal-wrapper,
+body.zh-dg-v2 .Modal,
+body.zh-dg-v2 body > .Popover,
+body.zh-dg-v2 body > div > .Popover,
+body.zh-dg-v2 .Menu.Menu--top,
+body.zh-dg-v2 [class*="ShareMenu"],
+body.zh-dg-v2 [class*="Favlist"],
+body.zh-dg-v2 [class*="favlist"],
+body.zh-dg-v2 [class*="CollectionDialog"],
+body.zh-dg-v2 [class*="Modal-content"]{
+  z-index:300000!important
+}
+body.zh-dg-v2 body > .Popover .Popover-content,
+body.zh-dg-v2 .Menu.Menu--top,
+body.zh-dg-v2 [class*="ShareMenu"]{
+  background:#2a2a2a!important;border:1px solid rgba(255,255,255,.12)!important;
+  color:#e8e8e8!important;box-shadow:0 8px 28px rgba(0,0,0,.45)!important
+}
+/* 「…」子菜单悬停高亮 */
+body.zh-dg-v2 .Menu-item:hover,
+body.zh-dg-v2 .Menu-item:focus,
+body.zh-dg-v2 [class*="Menu-item"]:hover,
+body.zh-dg-v2 [class*="Menu-item"]:focus,
+body.zh-dg-v2 body > .Popover .Popover-content button:hover,
+body.zh-dg-v2 body > .Popover .Popover-content a:hover,
+body.zh-dg-v2 body > .Popover [role="menuitem"]:hover,
+body.zh-dg-v2 body > .Popover [role="option"]:hover{
+  background:rgba(255,255,255,.12)!important;color:#fff!important
+}
 .zh-dg-comments{
   display:none;margin:0 12px 12px;padding:10px 12px;border-radius:12px;
   background:rgba(0,0,0,.28);border:1px solid var(--dg-line);max-height:420px;overflow:auto
@@ -327,24 +539,35 @@ body.zh-dg-hide-imgs #zh-dg-grid .zh-dg-media,
 body.zh-dg-hide-imgs .zh-dg-skel-media,
 body.zh-dg-hide-imgs .zh-dg-full img,
 body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
-/* 加载骨架 */
-#zh-dg-loading{display:none;margin-top:8px}
-#zh-dg-loading.on{display:block}
-.zh-dg-skel-card{
-  display:block;width:100%;margin:0;
-  border-radius:14px;overflow:hidden;background:var(--dg-card);border:1px solid var(--dg-line)
+/* 每列底部「待加载」占位（滚到底时像空卡片槽等待） */
+.zh-dg-pending{
+  display:block;width:100%;box-sizing:border-box;min-height:168px;
+  margin:0;border-radius:14px;overflow:hidden;
+  background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.14);
+  position:relative;flex:0 0 auto;
+  pointer-events:none
 }
-.zh-dg-skel-line,.zh-dg-skel-media{
-  background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.1),rgba(255,255,255,.04));
-  background-size:200% 100%;animation:zhDgShimmer 1.1s linear infinite;border-radius:8px
+.zh-dg-pending::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);
+  background-size:200% 100%;opacity:.35
 }
-.zh-dg-skel-media{height:140px;border-radius:0;margin-bottom:12px}
-.zh-dg-skel-line{height:12px;margin:0 14px 10px}
-.zh-dg-skel-line.w60{width:60%}
-.zh-dg-skel-line.w80{width:80%}
-.zh-dg-skel-line.w40{width:40%;margin-bottom:14px}
+.zh-dg-pending.is-loading{
+  border-color:rgba(255,255,255,.22);
+  background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.03))
+}
+.zh-dg-pending.is-loading::after{
+  opacity:1;animation:zhDgShimmer 1.1s linear infinite
+}
+.zh-dg-pending.is-hidden{display:none!important}
 @keyframes zhDgShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-#zh-dg-side{position:sticky;top:72px;display:flex;flex-direction:column;gap:12px;align-self:start;max-height:calc(100vh - 88px);overflow:auto}
+#zh-dg-side{
+  position:fixed!important;top:88px!important;right:16px!important;width:var(--dg-side);
+  display:flex;flex-direction:column;gap:12px;
+  max-height:calc(100vh - 104px);overflow:auto;z-index:20!important;
+  box-sizing:border-box;pointer-events:auto
+}
 .zh-dg-widget{background:var(--dg-card);border:1px solid var(--dg-line);border-radius:12px;padding:14px}
 .zh-dg-widget h3{margin:0 0 12px;font-size:15px}
 .zh-dg-banner{display:none}
@@ -374,7 +597,10 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
 .zh-dg-hotitem .hm{margin-top:4px;font-size:11px;color:var(--dg-mute)}
 .zh-dg-hotempty{font-size:12px;color:var(--dg-mute);padding:4px 0 8px}
 #zh-dg-sentinel{height:32px;width:100%}
-@media(max-width:900px){#zh-dg-shell{grid-template-columns:1fr}#zh-dg-side{position:static;max-height:none}}
+@media(max-width:900px){
+  #zh-dg-shell{padding-right:20px}
+  #zh-dg-side{display:none}
+}
 `;
 
   function injectCss() {
@@ -412,7 +638,10 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
       colCount !== n ||
       grid.children.length !== n ||
       ![...grid.children].every((c) => c.classList.contains("zh-dg-col"));
-    if (!needRebuild) return [...grid.children];
+    if (!needRebuild) {
+      ensurePendingSlots();
+      return [...grid.children];
+    }
 
     const cards = orderList.map((k) => cardElByKey(grid, k)).filter(Boolean);
     grid.innerHTML = "";
@@ -424,7 +653,35 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
     const cols = [...grid.children];
     cards.forEach((card, i) => cols[i % n].appendChild(card));
     colCount = n;
+    ensurePendingSlots();
     return cols;
+  }
+
+  function appendToCol(col, el) {
+    if (!col || !el) return;
+    const pending = col.querySelector(":scope > .zh-dg-pending");
+    if (pending) col.insertBefore(el, pending);
+    else col.appendChild(el);
+  }
+
+  function ensurePendingSlots() {
+    const cols = [...document.querySelectorAll("#zh-dg-grid > .zh-dg-col")];
+    if (!cols.length) return;
+    const show = !feedState.ended;
+    cols.forEach((col, i) => {
+      let slot = col.querySelector(":scope > .zh-dg-pending");
+      if (!slot) {
+        slot = document.createElement("div");
+        slot.className = "zh-dg-pending";
+        slot.setAttribute("aria-hidden", "true");
+        // 略有高度差，更接近真实卡片槽
+        slot.style.minHeight = `${150 + (i % 3) * 28}px`;
+        col.appendChild(slot);
+      } else if (slot !== col.lastElementChild) {
+        col.appendChild(slot);
+      }
+      slot.classList.toggle("is-hidden", !show);
+    });
   }
 
   function layoutCols() {
@@ -446,6 +703,382 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
       }
     });
   }
+
+  function hideZhidaEntry() {
+    const header =
+      document.querySelector(".AppHeader") ||
+      document.querySelector("header[role=banner]") ||
+      document.querySelector("header");
+    if (!header) return;
+
+    const mark = (el) => {
+      if (!el || el.nodeType !== 1) return;
+      el.classList.add("zh-dg-hide-zhida");
+      try {
+        el.style.setProperty("display", "none", "important");
+      } catch (_) {}
+    };
+
+    header.querySelectorAll("a[href*='zhida'], a[href*='zhida.ai']").forEach(mark);
+
+    header.querySelectorAll("a, button, div, span").forEach((el) => {
+      const aria = (el.getAttribute("aria-label") || "").replace(/\s+/g, "");
+      if (aria === "直答" || aria.includes("知乎直答")) {
+        mark(el.closest("a, button") || el);
+        return;
+      }
+      const direct = [...el.childNodes]
+        .filter((n) => n.nodeType === 3)
+        .map((n) => n.textContent.replace(/\s+/g, ""))
+        .join("");
+      if (direct !== "直答") return;
+      // 向上找到整颗胶囊按钮（含图标 +「直答」）
+      let p = el;
+      for (let i = 0; i < 6 && p && p !== header; i++) {
+        const t = (p.textContent || "").replace(/\s+/g, "");
+        if (
+          (p.matches?.("a, button") || p.getAttribute?.("role") === "button") &&
+          t.includes("直答") &&
+          t.length <= 12
+        ) {
+          mark(p);
+          return;
+        }
+        if (t === "直答" || (t.includes("直答") && t.length <= 8 && p.querySelector?.("svg, img"))) {
+          mark(p);
+          return;
+        }
+        p = p.parentElement;
+      }
+    });
+  }
+
+  function placeSideBelowHeader() {
+    const side = document.getElementById("zh-dg-side");
+    const header =
+      document.querySelector(".AppHeader") ||
+      document.querySelector("header[role=banner]") ||
+      document.querySelector("header");
+    if (!side) return;
+    // 侧栏挂到 body，避免压在 App-main 里盖住顶栏头像
+    if (side.parentElement !== document.body) {
+      document.body.appendChild(side);
+    }
+    const bottom = header ? header.getBoundingClientRect().bottom : 64;
+    const top = Math.max(72, Math.ceil(bottom + 10));
+    side.style.setProperty("top", top + "px", "important");
+    side.style.setProperty("z-index", "20", "important");
+    side.style.setProperty("max-height", `calc(100vh - ${top + 16}px)`, "important");
+  }
+
+  function removeAvatarBlockSquare() {
+    const header =
+      document.querySelector(".AppHeader") ||
+      document.querySelector("header[role=banner]") ||
+      document.querySelector("header");
+    if (!header) return;
+
+    const imgs = [
+      ...header.querySelectorAll("img.Avatar, .Avatar img, img[class*='Avatar']"),
+    ];
+    if (!imgs.length) return;
+
+    const keep = (el) => {
+      if (!el || el.nodeType !== 1) return true;
+      if (el === header || el === document.body || el === document.documentElement) return true;
+      if (el.id === "zh-dg-shell" || el.id === "zh-dg-main" || el.id === "root") return true;
+      if (el.closest?.("#zh-dg-grid, #zh-dg-main")) return true;
+      const t = (el.textContent || "").replace(/\s+/g, "");
+      // 保留消息/私信/创作中心入口
+      if (/^(消息|私信|创作中心)$/.test(t) || (t.length <= 6 && /消息|私信|创作/.test(t))) return true;
+      if (el.closest?.("a[href*='messages'], a[href*='inbox'], a[href*='creator']")) return true;
+      return false;
+    };
+
+    const kill = (el) => {
+      if (!el || keep(el)) return false;
+      // 侧栏压住头像 → 下移，不删侧栏
+      if (el.id === "zh-dg-side" || el.closest?.("#zh-dg-side")) {
+        placeSideBelowHeader();
+        return true;
+      }
+      try {
+        el.setAttribute("data-zh-dg-killed", "avatar-block");
+        el.remove();
+        return true;
+      } catch (_) {
+        try {
+          el.style.setProperty("display", "none", "important");
+          el.style.setProperty("pointer-events", "none", "important");
+          return true;
+        } catch (__) {
+          return false;
+        }
+      }
+    };
+
+    imgs.forEach((img) => {
+      const ir = img.getBoundingClientRect();
+      if (ir.width < 10 || ir.height < 10) return;
+
+      // 头像上半区取样：谁盖在上面就删谁
+      const pts = [
+        [0.22, 0.22],
+        [0.35, 0.28],
+        [0.5, 0.3],
+        [0.28, 0.45],
+        [0.45, 0.4],
+      ];
+      pts.forEach(([fx, fy]) => {
+        const x = ir.left + ir.width * fx;
+        const y = ir.top + ir.height * fy;
+        const topEl = document.elementFromPoint(x, y);
+        if (!topEl) return;
+        if (topEl === img || img.contains(topEl)) return;
+        // 点到包裹头像的按钮本身：检查是否有遮挡子节点
+        const wrap = img.closest("button, a, [role='button']");
+        if (wrap && (topEl === wrap || wrap.contains(topEl)) && (topEl === img || img.contains(topEl) || topEl.contains(img))) {
+          return;
+        }
+        if (wrap && wrap.contains(topEl) && topEl !== img && !topEl.contains(img)) {
+          // 按钮内部的遮挡层（非头像）
+          if (!topEl.querySelector?.("img.Avatar, img[class*='Avatar']")) {
+            kill(topEl);
+            return;
+          }
+        }
+        // 找到可删的最近容器
+        let cur = topEl;
+        for (let i = 0; i < 6 && cur; i++) {
+          if (cur === header || cur.contains?.(img)) break;
+          const r = cur.getBoundingClientRect?.();
+          if (!r) break;
+          const overlapW = Math.min(r.right, ir.right) - Math.max(r.left, ir.left);
+          const overlapH = Math.min(r.bottom, ir.bottom) - Math.max(r.top, ir.top);
+          if (overlapW > ir.width * 0.25 && overlapH > ir.height * 0.25) {
+            if (kill(cur)) return;
+          }
+          cur = cur.parentElement;
+        }
+      });
+
+      // 再扫一遍 header 内绝对定位且盖住头像上半的空块
+      header.querySelectorAll("div, span, i, b, em, section").forEach((el) => {
+        if (el === img || el.contains(img) || img.contains(el)) return;
+        if (el.querySelector?.("img.Avatar, svg, input, a, button")) {
+          // 若自身就是空装饰块仍可能盖住
+          if (el.querySelector("img.Avatar")) return;
+        }
+        const st = getComputedStyle(el);
+        if (st.display === "none" || st.visibility === "hidden") return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 12 || r.height < 12 || r.width > 120 || r.height > 80) return;
+        const overlapW = Math.min(r.right, ir.right) - Math.max(r.left, ir.left);
+        const overlapH = Math.min(r.bottom, ir.top + ir.height * 0.7) - Math.max(r.top, ir.top);
+        if (overlapW < ir.width * 0.35 || overlapH < ir.height * 0.25) return;
+        const txt = (el.textContent || "").replace(/\s+/g, "");
+        if (txt.length > 4) return;
+        // 空方块 / 几乎无内容 → 删除
+        kill(el);
+      });
+    });
+
+    placeSideBelowHeader();
+  }
+
+  function fixHeaderProfileClick() {
+    removeAvatarBlockSquare();
+
+    const header =
+      document.querySelector(".AppHeader") ||
+      document.querySelector("header[role=banner]") ||
+      document.querySelector("header");
+    if (!header) return;
+
+    const unlock = (el) => {
+      if (!el || el.nodeType !== 1) return;
+      el.classList.remove("zh-dg-hide-msg-badge");
+      try {
+        el.style.removeProperty("pointer-events");
+        el.style.removeProperty("display");
+        el.style.removeProperty("visibility");
+        el.style.removeProperty("opacity");
+        el.style.setProperty("pointer-events", "auto", "important");
+        el.style.setProperty("cursor", "pointer", "important");
+      } catch (_) {}
+    };
+
+    const clearSquare = (el) => {
+      if (!el || el.nodeType !== 1) return;
+      try {
+        el.style.setProperty("background", "transparent", "important");
+        el.style.setProperty("background-color", "transparent", "important");
+        el.style.setProperty("border", "0", "important");
+        el.style.setProperty("box-shadow", "none", "important");
+        el.style.setProperty("border-radius", "50%", "important");
+        el.style.setProperty("padding", "0", "important");
+        el.style.setProperty("overflow", "visible", "important");
+      } catch (_) {}
+    };
+
+    header.querySelectorAll("img.Avatar, .Avatar img, img[class*='Avatar']").forEach((img) => {
+      unlock(img);
+      try {
+        img.style.setProperty("border-radius", "50%", "important");
+        img.style.setProperty("width", "32px", "important");
+        img.style.setProperty("height", "32px", "important");
+        img.style.setProperty("object-fit", "cover", "important");
+        img.style.setProperty("display", "block", "important");
+        img.style.setProperty("position", "relative", "important");
+        img.style.setProperty("z-index", "30", "important");
+      } catch (_) {}
+      const hit =
+        img.closest("button, a, [role='button'], .AppHeader-profileEntry, .AppHeader-userInfo") ||
+        img.parentElement;
+      unlock(hit);
+      clearSquare(hit);
+      if (hit) {
+        hit.style.setProperty("z-index", "30", "important");
+        hit.style.setProperty("position", "relative", "important");
+      }
+    });
+
+    // 搜索框与「+」间距
+    const sb = header.querySelector(".SearchBar");
+    if (sb) {
+      sb.style.setProperty("margin-right", "18px", "important");
+      const next = sb.nextElementSibling;
+      if (next) next.style.setProperty("margin-left", "8px", "important");
+    }
+  }
+
+  function killMsgBadgeEl(el) {
+    if (!el || el.nodeType !== 1) return;
+    el.classList.add("zh-dg-hide-msg-badge");
+    try {
+      el.style.setProperty("display", "none", "important");
+      el.style.setProperty("visibility", "hidden", "important");
+      el.style.setProperty("opacity", "0", "important");
+      el.style.setProperty("pointer-events", "none", "important");
+    } catch (_) {}
+  }
+
+  function isDigitBadgeText(t) {
+    return /^(\d{1,3}\+?|99\+)$/.test(String(t || "").trim());
+  }
+
+  function isRedish(bg) {
+    const m = String(bg || "").match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (!m) return /#(f{2}|e[0-9a-f]|ff)[0-9a-f]{0,2}[0-4]/i.test(bg || "");
+    const r = +m[1],
+      g = +m[2],
+      b = +m[3];
+    return r >= 180 && g <= 120 && b <= 120;
+  }
+
+  function hideMessageBadge() {
+    const header =
+      document.querySelector(".AppHeader") ||
+      document.querySelector("header[role=banner]") ||
+      document.querySelector("header") ||
+      document.body;
+    if (!header) return;
+
+    header.querySelectorAll(".Messages-count, .css-ybodb").forEach(killMsgBadgeEl);
+
+    // 找到「私信」文案，向上找入口容器，再清其中角标
+    const labelNodes = [];
+    header.querySelectorAll("a, button, span, div, p, label").forEach((el) => {
+      const aria = el.getAttribute("aria-label") || "";
+      if (aria.includes("私信")) labelNodes.push(el);
+      // 自身直接文本为「私信」
+      const direct = [...el.childNodes]
+        .filter((n) => n.nodeType === 3)
+        .map((n) => n.textContent.replace(/\s+/g, ""))
+        .join("");
+      if (direct === "私信") labelNodes.push(el);
+      if (el.childElementCount === 0 && (el.textContent || "").replace(/\s+/g, "") === "私信") {
+        labelNodes.push(el);
+      }
+    });
+
+    const boxes = new Set();
+    labelNodes.forEach((el) => {
+      let p = el;
+      for (let i = 0; i < 8 && p && p !== header; i++) {
+        boxes.add(p);
+        // 优先停在可点击入口
+        if (p.matches?.("a, button, [role='button']")) break;
+        p = p.parentElement;
+      }
+    });
+
+    // href 含 messages 的入口
+    header.querySelectorAll("a[href*='messages'], a[href*='inbox'], a[href*='Message']").forEach((a) => boxes.add(a));
+
+    boxes.forEach((box) => {
+      box.querySelectorAll("*").forEach((node) => {
+        if (node.closest?.("svg")) return;
+        if (node.querySelector?.("svg, img, a, button")) return;
+        const full = (node.textContent || "").replace(/\s+/g, "");
+        if (full.includes("私信") || full.includes("消息") || full.includes("创作")) return;
+
+        const rect = node.getBoundingClientRect?.();
+        const w = rect?.width || 0;
+        const h = rect?.height || 0;
+        if (w > 36 || h > 36) return;
+
+        let st;
+        try {
+          st = getComputedStyle(node);
+        } catch (_) {
+          return;
+        }
+
+        const digit = isDigitBadgeText(full);
+        const abs = st.position === "absolute" || st.position === "fixed";
+        const red = isRedish(st.backgroundColor) || isRedish(st.borderColor);
+        // 纯数字小块，或绝对定位的小红点/带数字角标
+        if (digit || (abs && (digit || red || (w >= 6 && h >= 6 && w <= 24 && h <= 24 && red)))) {
+          killMsgBadgeEl(node);
+        }
+      });
+    });
+
+    try {
+      const next = document.title
+        .replace(/^\(\d+\s*封私信[，,]\s*/u, "(")
+        .replace(/^\(\d+\s*封私信\)\s*/u, "");
+      if (next !== document.title) document.title = next;
+    } catch (_) {}
+  }
+
+  // 尽早、全站持续清理角标（不限于首页）
+  function watchMessageBadge() {
+    if (watchMessageBadge._on) return;
+    watchMessageBadge._on = true;
+    const run = () => {
+      try {
+        hideZhidaEntry();
+        hideMessageBadge();
+        fixHeaderProfileClick();
+      } catch (_) {}
+    };
+    run();
+    setInterval(run, 800);
+    const startObs = () => {
+      const root = document.querySelector(".AppHeader") || document.body || document.documentElement;
+      if (!root || watchMessageBadge._obs) return;
+      watchMessageBadge._obs = new MutationObserver(() => {
+        clearTimeout(watchMessageBadge._t);
+        watchMessageBadge._t = setTimeout(run, 50);
+      });
+      watchMessageBadge._obs.observe(root, { childList: true, subtree: true, characterData: true });
+    };
+    if (document.body) startObs();
+    else document.addEventListener("DOMContentLoaded", startObs, { once: true });
+  }
+  watchMessageBadge();
 
   function text(el) {
     return (el?.textContent || "").replace(/\s+/g, " ").trim();
@@ -600,9 +1233,149 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
         comments: c && c[1] ? c[1] : 0,
         contentHtml: "",
         voted: false,
+        sourceEl: node,
       });
     });
     return out;
+  }
+
+  const ACTION_BAR_SEL = ".ContentItem-actions, .RichContent-actions";
+
+  function findCardByKey(key) {
+    return [...document.querySelectorAll("#zh-dg-grid .zh-dg-card")].find(
+      (c) => c.getAttribute("data-key") === key
+    );
+  }
+
+  function findActionBar(root) {
+    if (!root || !root.querySelector) return null;
+    return root.querySelector(ACTION_BAR_SEL);
+  }
+
+  function findSourceEl(item) {
+    if (!item) return null;
+    if (item.sourceEl && document.contains(item.sourceEl)) return item.sourceEl;
+    const scope = document.getElementById("zh-dg-scraper") || document;
+    const nodes = scope.querySelectorAll(".Card.TopstoryItem, .TopstoryItem");
+    for (const node of nodes) {
+      if (node.classList.contains("TopstoryItem--advertCard")) continue;
+      if (item.id) {
+        const id = String(item.id);
+        if (item.kind === "answer" && node.querySelector(`a[href*="/answer/${id}"]`)) return node;
+        if (item.kind === "article" && node.querySelector(`a[href*="/p/${id}"]`)) return node;
+        if (item.kind === "zvideo" && node.querySelector(`a[href*="/zvideo/${id}"]`)) return node;
+        if (item.kind === "question" && node.querySelector(`a[href*="/question/${id}"]`)) return node;
+      }
+      if (item.href) {
+        try {
+          const path = new URL(item.href, location.origin).pathname;
+          if (path.length > 3 && node.querySelector(`a[href*="${path}"]`)) return node;
+        } catch (_) {}
+      }
+      const title = text(node.querySelector(".ContentItem-title, h2"));
+      if (title && item.title && title === item.title) return node;
+    }
+    return null;
+  }
+
+  function harvestSourceEls() {
+    const scope = document.getElementById("zh-dg-scraper") || document;
+    scope.querySelectorAll(".Card.TopstoryItem, .TopstoryItem").forEach((node) => {
+      if (node.classList.contains("TopstoryItem--advertCard")) return;
+      const title = text(node.querySelector(".ContentItem-title, h2"));
+      if (!title) return;
+      const a =
+        node.querySelector(".ContentItem-title a, h2 a, a[href*='/question/'], a[href*='zhuanlan']") ||
+        node.querySelector("a");
+      const href = a?.href || location.href;
+      const key = href + "|" + title;
+      let item = store.get(key);
+      if (!item) {
+        const mAns = href.match(/answer\/(\d+)/);
+        const mArt = href.match(/\/p\/(\d+)/);
+        const mZv = href.match(/zvideo\/(\d+)/);
+        const id = (mAns && mAns[1]) || (mArt && mArt[1]) || (mZv && mZv[1]);
+        if (id) {
+          for (const it of store.values()) {
+            if (String(it.id) === id) {
+              item = it;
+              break;
+            }
+          }
+        }
+      }
+      if (!item) {
+        for (const it of store.values()) {
+          if (it.title === title) {
+            item = it;
+            break;
+          }
+        }
+      }
+      if (item) item.sourceEl = node;
+    });
+  }
+
+  function polishNativeActionBar(bar) {
+    if (!bar) return;
+    bar.style.setProperty("display", "flex", "important");
+    bar.style.setProperty("flex-direction", "row", "important");
+    bar.style.setProperty("flex-wrap", "nowrap", "important");
+    bar.style.setProperty("align-items", "center", "important");
+    if (bar.dataset.zhDgAria === "1") return;
+    bar.dataset.zhDgAria = "1";
+    bar.querySelectorAll("button, a, [role='button'], .Button").forEach((btn) => {
+      if (!btn.getAttribute("aria-label")) {
+        const raw = (btn.textContent || "").replace(/\s+/g, " ").trim();
+        if (raw) btn.setAttribute("aria-label", raw.slice(0, 40));
+      }
+      if (!btn.title) btn.title = btn.getAttribute("aria-label") || "";
+    });
+  }
+
+  function attachNativeActions(card, item) {
+    if (!card || !item) return false;
+    const foot = card.querySelector(".zh-dg-foot");
+    if (!foot) return false;
+
+    const src = findSourceEl(item);
+    if (src) item.sourceEl = src;
+
+    const existing = findActionBar(foot);
+    let bar = src ? findActionBar(src) : null;
+
+    // 已挂上且源端没有更新出新栏
+    if (existing && (!bar || bar === existing)) {
+      foot.classList.add("zh-dg-foot--native");
+      polishNativeActionBar(existing);
+      return true;
+    }
+    if (!bar) return !!existing;
+
+    // 在原位置留占位，便于 React 更新时再找回
+    if (!bar.closest(".zh-dg-foot")) {
+      const ph = document.createElement("div");
+      ph.className = "zh-dg-actions-ph";
+      ph.setAttribute("data-zh-dg-key", item.key);
+      ph.style.cssText = "display:none!important";
+      bar.parentNode.insertBefore(ph, bar);
+      item._actionsPh = ph;
+    }
+
+    foot.innerHTML = "";
+    foot.classList.add("zh-dg-foot--native");
+    foot.appendChild(bar);
+    polishNativeActionBar(bar);
+    return true;
+  }
+
+  function linkNativeActions() {
+    harvestSourceEls();
+    for (const [key, item] of store) {
+      const card = findCardByKey(key);
+      if (!card) continue;
+      attachNativeActions(card, item);
+    }
   }
 
   function cardHTML(item) {
@@ -635,9 +1408,10 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
   }
 
   function setLoading(on) {
-    const box = document.getElementById("zh-dg-loading");
-    if (!box) return;
-    box.classList.toggle("on", !!on);
+    ensurePendingSlots();
+    document.querySelectorAll("#zh-dg-grid .zh-dg-pending").forEach((el) => {
+      el.classList.toggle("is-loading", !!on);
+    });
   }
 
   function render(items) {
@@ -654,8 +1428,15 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
       const wrap = document.createElement("div");
       wrap.innerHTML = cardHTML(it);
       const card = wrap.firstElementChild;
-      if (card) cols[(orderList.length - 1) % n].appendChild(card);
+      if (card) {
+        appendToCol(cols[(orderList.length - 1) % n], card);
+        attachNativeActions(card, it);
+      }
     });
+    // API 先到、DOM 后到：补挂原站操作栏
+    queueMicrotask(() => linkNativeActions());
+    setTimeout(linkNativeActions, 400);
+    setTimeout(linkNativeActions, 1200);
     window.__ZH_DG_COUNT__ = rendered.size;
     setStatus(`已加载 ${rendered.size} 条`);
     return fresh.length;
@@ -687,9 +1468,14 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
     document.getElementById("zh-dg-actions")?.remove();
     document.getElementById("zh-dg-guess")?.remove();
     hideHeaderLogo();
+    hideZhidaEntry();
+    hideMessageBadge();
+    fixHeaderProfileClick();
+    placeSideBelowHeader();
 
     if (document.getElementById("zh-dg-shell")) {
       // 去掉与顶栏重复的「快捷入口」
+      document.getElementById("zh-dg-loading")?.remove();
       document.querySelectorAll("#zh-dg-side .zh-dg-widget").forEach((w) => {
         const h = w.querySelector("h3");
         if (h && /快捷入口/.test(h.textContent || "")) w.remove();
@@ -722,13 +1508,6 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
     shell.innerHTML = `<div id="zh-dg-main">
       <div id="zh-dg-status">正在重建信息流…</div>
       <div id="zh-dg-grid"></div>
-      <div id="zh-dg-loading">
-        <div class="zh-dg-skel">${[1, 2, 3, 4, 5, 6]
-          .map(
-            () => `<div class="zh-dg-skel-card"><div class="zh-dg-skel-media"></div><div class="zh-dg-skel-line w80"></div><div class="zh-dg-skel-line w60"></div><div class="zh-dg-skel-line w40"></div></div>`
-          )
-          .join("")}</div>
-      </div>
       <div id="zh-dg-sentinel"></div>
     </div>
     <aside id="zh-dg-side">
@@ -1152,6 +1931,28 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
       // 标题保持默认新标签打开
       if (ev.target.closest("a.title")) return;
 
+      // 原站操作栏：保留原生点击（赞/反对/收藏/喜欢/分享/…）
+      // 「评论」在隐藏 DOM 内展开不可见，改为打开卡片内评论面板
+      const nativeFoot = ev.target.closest(".zh-dg-foot--native");
+      if (nativeFoot) {
+        const btn = ev.target.closest("button, a, [role='button'], .Button");
+        const lab = ((btn && (btn.getAttribute("aria-label") || btn.textContent)) || "")
+          .replace(/\s+/g, " ")
+          .trim();
+        const isComment =
+          !!btn &&
+          (/评论/.test(lab) || /comment/i.test(btn.className || "")) &&
+          !/关闭评论|收起评论/.test(lab);
+        if (isComment) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const open = !card.classList.contains("is-comments");
+          card.classList.toggle("is-comments", open);
+          if (open) await openComments(card, item);
+        }
+        return;
+      }
+
       // 评论区内交互不触发展开正文
       if (ev.target.closest("[data-comments]")) {
         ev.stopPropagation();
@@ -1311,6 +2112,7 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
     } finally {
       loading = false;
       setLoading(false);
+      ensurePendingSlots();
     }
   }
 
@@ -1318,7 +2120,10 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
     if (!isHome()) return;
     ensureShell();
     ensureScraper();
+    harvestSourceEls();
     render(fromDom());
+    linkNativeActions();
+    ensurePendingSlots();
   }
 
   function bootUi() {
@@ -1331,7 +2136,21 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
 
     window.addEventListener("zh-dg-data", (ev) => {
       render((ev.detail?.data || []).map(fromApi).filter(Boolean));
+      linkNativeActions();
     });
+
+    // 原站懒渲染操作栏 / React 重建时重新挂到卡片
+    const moScrape = new MutationObserver(() => {
+      clearTimeout(moScrape._t);
+      moScrape._t = setTimeout(linkNativeActions, 200);
+    });
+    const watchScraper = () => {
+      const sc = document.getElementById("zh-dg-scraper");
+      if (sc) moScrape.observe(sc, { childList: true, subtree: true });
+      else setTimeout(watchScraper, 300);
+    };
+    watchScraper();
+    setInterval(linkNativeActions, 3000);
 
     const io = new IntersectionObserver(
       (ents) => {
@@ -1378,10 +2197,19 @@ body.zh-dg-hide-imgs .zh-dg-full video{display:none!important}
     let n = 0;
     const timer = setInterval(() => {
       sync();
+      hideZhidaEntry();
+      hideMessageBadge();
+      fixHeaderProfileClick();
       if ([2, 4, 8].includes(n)) loadMore("boot-" + n);
       n += 1;
       if (n > 30) clearInterval(timer);
     }, 600);
+
+    setInterval(() => {
+      hideZhidaEntry();
+      hideMessageBadge();
+      fixHeaderProfileClick();
+    }, 2000);
 
     new MutationObserver(() => {
       clearTimeout(bootUi._t);
