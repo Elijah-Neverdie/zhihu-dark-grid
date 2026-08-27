@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.4.2
-// @description  浮层压暗背景；链接悬停改为高亮灰；从 GitHub 自动更新
+// @version      3.5.0
+// @description  修复侧栏叠层；GitHub 自动更新；README 标明版本
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -195,7 +195,7 @@ body.zh-dg-v2,body.zh-dg-v2 #root{background:#141414!important;color:#e8e8e8!imp
 body.zh-dg-v2{
   --dg-card:#1e1e1e;--dg-card2:#262626;--dg-line:rgba(255,255,255,.08);
   --dg-text:#e8e8e8;--dg-sub:#a3a3a3;--dg-mute:#737373;--dg-accent:#9a9a9a;
-  --dg-elev:#242424;--dg-max:100%;--dg-side:280px;overflow-x:hidden!important;
+  --dg-elev:#242424;--dg-max:100%;--dg-side:280px;--dg-img-sat:1;overflow-x:hidden!important;
   --dg-overlay:#2a2a2a;--dg-overlay-2:#323232;--dg-overlay-3:#3a3a3a;
   --dg-overlay-line:rgba(255,255,255,.14);--dg-overlay-hover:rgba(255,255,255,.08);
   --dg-overlay-link:#cfcfcf;--dg-overlay-link-hover:#f2f2f2
@@ -328,13 +328,27 @@ body.zh-dg-v2 .AppHeader [class*="AskQuestion"]{
   padding:0!important;border-radius:50%!important;
   display:inline-flex!important;align-items:center!important;justify-content:center!important
 }
-/* 原站信息流移出文档流；勿隐藏整个 App-main 子树，否则消息/通知面板会被吃掉 */
+/* 原站信息流 / 侧栏移出文档流 */
 body.zh-dg-v2 .Topstory-container,body.zh-dg-v2 .GlobalSideBar,body.zh-dg-v2 .Topstory-sideBar,
 body.zh-dg-v2 .Footer,body.zh-dg-v2 footer,body.zh-dg-v2 .CornerButtons,body.zh-dg-v2 .Adboard,
-body.zh-dg-v2 .Topstory,body.zh-dg-v2 .Topstory-mainColumn,body.zh-dg-v2 .TopstoryMain{
+body.zh-dg-v2 .Topstory,body.zh-dg-v2 .Topstory-mainColumn,body.zh-dg-v2 .TopstoryMain,
+body.zh-dg-v2 .App-main .Sticky,body.zh-dg-v2 .App-main [class*="GlobalSideBar"],
+body.zh-dg-v2 .App-main [class*="Topstory-side"],body.zh-dg-v2 .App-main [class*="SideBar"]:not(#zh-dg-side),
+body.zh-dg-v2 .App-main [class*="Sidebar"]:not(#zh-dg-side){
   position:fixed!important;left:-10000px!important;top:0!important;width:1px!important;height:1px!important;
   max-height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;
   margin:0!important;padding:0!important;border:0!important
+}
+/* 首页改造态：App-main 内只留自建 shell（消息/通知浮层一般挂在 body，不受影响） */
+body.zh-dg-v2 .App-main > *:not(#zh-dg-shell){
+  position:fixed!important;left:-10000px!important;top:0!important;width:1px!important;height:1px!important;
+  max-height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;
+  margin:0!important;padding:0!important;border:0!important;visibility:hidden!important
+}
+body.zh-dg-v2 .App-main > #zh-dg-shell{
+  position:relative!important;left:auto!important;top:auto!important;width:auto!important;height:auto!important;
+  max-height:none!important;overflow:visible!important;opacity:1!important;pointer-events:auto!important;
+  visibility:visible!important;margin:12px auto 48px!important
 }
 body.zh-dg-v2 #root,body.zh-dg-v2 .App,body.zh-dg-v2 .App-main,body.zh-dg-v2 .App-mainColumn{
   min-height:0!important;height:auto!important;max-height:none!important
@@ -390,7 +404,9 @@ body.zh-dg-v2 #zh-dg-scraper *{pointer-events:none!important}
   aspect-ratio:16/10;max-height:280px;
   transition:max-height .2s ease,opacity .2s ease,margin .2s ease,padding .2s ease
 }
-.zh-dg-media img{width:100%;height:100%;object-fit:cover;display:block}
+.zh-dg-media img{width:100%;height:100%;object-fit:cover;display:block;
+  filter:saturate(var(--dg-img-sat,1));transition:filter .2s ease
+}
 .zh-dg-card.has-img .zh-dg-media{aspect-ratio:auto;max-height:280px}
 .zh-dg-card.has-img .zh-dg-media img{height:auto;max-height:280px;object-fit:cover}
 /* 纯文本卡片 */
@@ -415,7 +431,10 @@ body.zh-dg-v2 #zh-dg-scraper *{pointer-events:none!important}
 }
 .zh-dg-card.is-expanded .zh-dg-full{display:block}
 .zh-dg-card.is-expanded .zh-dg-excerpt,.zh-dg-card.is-expanded .zh-dg-textblock{display:none}
-.zh-dg-full img,.zh-dg-full video{max-width:100%!important;height:auto!important;border-radius:8px}
+.zh-dg-full img,.zh-dg-full video{
+  max-width:100%!important;height:auto!important;border-radius:8px;
+  filter:saturate(var(--dg-img-sat,1));transition:filter .2s ease
+}
 .zh-dg-full p{margin:0 0 .8em}
 .zh-dg-hint{margin-top:8px;font-size:12px;color:var(--dg-mute)}
 .zh-dg-foot{
@@ -740,11 +759,15 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
 @keyframes zhDgShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 #zh-dg-side{
   position:fixed!important;top:88px!important;right:16px!important;width:var(--dg-side);
-  display:flex;flex-direction:column;gap:12px;
-  max-height:calc(100vh - 104px);overflow:auto;z-index:20!important;
-  box-sizing:border-box;pointer-events:auto
+  display:flex!important;flex-direction:column;gap:12px;
+  max-height:calc(100vh - 104px);overflow:auto;z-index:40!important;
+  box-sizing:border-box;pointer-events:auto;isolation:isolate;
+  transform:translateZ(0);contain:layout style
 }
-.zh-dg-widget{background:var(--dg-card);border:1px solid var(--dg-line);border-radius:12px;padding:14px}
+.zh-dg-widget{
+  background:var(--dg-card)!important;border:1px solid var(--dg-line)!important;
+  border-radius:12px;padding:14px;opacity:1!important
+}
 .zh-dg-widget h3{margin:0 0 12px;font-size:15px}
 .zh-dg-banner{display:none}
 .zh-dg-sbtn{display:block;width:100%;height:36px;border-radius:8px;border:0;text-align:center;line-height:36px;text-decoration:none!important;margin-bottom:8px;font-size:13px;box-sizing:border-box}
@@ -930,21 +953,87 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
   }
 
   function placeSideBelowHeader() {
-    const side = document.getElementById("zh-dg-side");
+    let side = document.getElementById("zh-dg-side");
     const header =
       document.querySelector(".AppHeader") ||
       document.querySelector("header[role=banner]") ||
       document.querySelector("header");
     if (!side) return;
-    // 侧栏挂到 body，避免压在 App-main 里盖住顶栏头像
+    // 必须挂在 body：留在 App-main/shell 里时，原站 transform/filter 会让 fixed 错位叠到网格上
     if (side.parentElement !== document.body) {
       document.body.appendChild(side);
     }
+    side.style.setProperty("position", "fixed", "important");
+    side.style.setProperty("right", "16px", "important");
+    side.style.setProperty("left", "auto", "important");
+    side.style.setProperty("display", "flex", "important");
+    side.style.setProperty("z-index", "40", "important");
     const bottom = header ? header.getBoundingClientRect().bottom : 64;
     const top = Math.max(72, Math.ceil(bottom + 10));
     side.style.setProperty("top", top + "px", "important");
-    side.style.setProperty("z-index", "20", "important");
     side.style.setProperty("max-height", `calc(100vh - ${top + 16}px)`, "important");
+  }
+
+  function parkNativeSidebars(scraper) {
+    if (!scraper) return;
+    const sels = [
+      ".Topstory-container",
+      ".GlobalSideBar",
+      ".Topstory-sideBar",
+      ".Footer",
+      "footer",
+      ".Topstory",
+      ".Topstory-mainColumn",
+      ".TopstoryMain",
+      ".CornerButtons",
+      ".Adboard",
+      ".App-main .Sticky",
+      '.App-main [class*="GlobalSideBar"]',
+      '.App-main [class*="Topstory-side"]',
+      '.App-main [class*="SideBar"]',
+      '.App-main [class*="Sidebar"]',
+    ];
+    sels.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
+        if (!el || el.id === "zh-dg-side") return;
+        if (el.closest("#zh-dg-shell") || el.closest("#zh-dg-side") || el.closest("#zh-dg-scraper")) return;
+        if (el.closest?.(".Popover-content, [class*='Popover-content'], [role='dialog'], [role='menu']")) return;
+        if (!scraper.contains(el)) {
+          try {
+            scraper.appendChild(el);
+          } catch (_) {}
+        }
+      });
+    });
+    // 原站晚注入的「创作中心 / 热榜」卡片（无稳定 class）
+    const main = document.querySelector(".App-main");
+    if (!main) return;
+    main.querySelectorAll("div.Card, section, aside").forEach((el) => {
+      if (!el || el.closest("#zh-dg-shell, #zh-dg-side, #zh-dg-scraper")) return;
+      if (el.closest?.(".Popover-content, [class*='Popover-content'], [role='dialog']")) return;
+      const t = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (t.length > 400) return;
+      const hitCreator = t.includes("创作中心") && (t.includes("进入创作中心") || t.includes("草稿"));
+      const hitHot = t.includes("热榜") && /\d+\s*万热度|\d+\s*热度/.test(t);
+      if (!hitCreator && !hitHot) return;
+      const r = el.getBoundingClientRect?.();
+      if (r && (r.width > 420 || r.height < 40)) return;
+      try {
+        scraper.appendChild(el);
+      } catch (_) {}
+    });
+  }
+
+  function ensureScraper() {
+    let scraper = document.getElementById("zh-dg-scraper");
+    if (!scraper) {
+      scraper = document.createElement("div");
+      scraper.id = "zh-dg-scraper";
+      document.body.appendChild(scraper);
+    }
+    // 只挪走信息流/侧栏/页脚，绝不吞掉消息/通知浮层
+    parkNativeSidebars(scraper);
+    return scraper;
   }
 
   function isHeaderOverlayOpen() {
@@ -1376,6 +1465,8 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
         // 消息浮层打开时：只保证入口可点，禁止清 DOM / 卸页面
         if (isHeaderOverlayOpen()) {
           ensureHeaderShortcuts();
+          ensureScraper();
+          placeSideBelowHeader();
           return;
         }
         hideZhidaEntry();
@@ -2015,31 +2106,36 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     return fresh.length;
   }
 
-  function ensureScraper() {
-    let scraper = document.getElementById("zh-dg-scraper");
-    if (!scraper) {
-      scraper = document.createElement("div");
-      scraper.id = "zh-dg-scraper";
-      document.body.appendChild(scraper);
+  function sidePanelHTML() {
+    return `
+      <div class="zh-dg-widget"><h3>创作中心</h3>
+        <a class="zh-dg-sbtn primary" href="https://www.zhihu.com/creator">进入创作中心</a>
+        <a class="zh-dg-sbtn ghost" href="https://www.zhihu.com/question/waiting">等待收录</a></div>
+      <div class="zh-dg-widget"><h3>热门榜单</h3>
+        <div class="zh-dg-hotlist" id="zh-dg-hotlist"><div class="zh-dg-hotempty">加载热榜中…</div></div>
+        <a class="zh-dg-sbtn ghost" href="https://www.zhihu.com/hot" target="_blank" rel="noopener">查看完整榜单</a></div>`;
+  }
+
+  function ensureSidePanel() {
+    // 去重：历史 bug 可能留下多个侧栏
+    const all = [...document.querySelectorAll("#zh-dg-side")];
+    let side = all[0] || null;
+    all.slice(1).forEach((el) => el.remove());
+    if (!side) {
+      side = document.createElement("aside");
+      side.id = "zh-dg-side";
+      side.innerHTML = sidePanelHTML();
+      document.body.appendChild(side);
+      loadHotList();
+    } else if (side.parentElement !== document.body) {
+      document.body.appendChild(side);
     }
-    // 只挪走信息流/侧栏/页脚，绝不吞掉 App-main 里其它页面（消息/通知等）
-    [
-      ".Topstory-container",
-      ".GlobalSideBar",
-      ".Topstory-sideBar",
-      ".Footer",
-      "footer",
-      ".Topstory",
-      ".Topstory-mainColumn",
-      ".TopstoryMain",
-      ".CornerButtons",
-      ".Adboard",
-    ].forEach((sel) => {
-      document.querySelectorAll(sel).forEach((el) => {
-        if (el.closest("#zh-dg-shell") || el.closest("#zh-dg-side")) return;
-        if (!scraper.contains(el)) scraper.appendChild(el);
-      });
-    });
+    if (!side.querySelector("#zh-dg-hotlist")) {
+      side.innerHTML = sidePanelHTML();
+      loadHotList();
+    }
+    placeSideBelowHeader();
+    return side;
   }
 
   function ensureShell() {
@@ -2051,33 +2147,19 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     hideMessageBadge();
     fixHeaderProfileClick();
     ensureHeaderShortcuts();
-    placeSideBelowHeader();
 
     if (document.getElementById("zh-dg-shell")) {
       // 去掉与顶栏重复的「快捷入口」
       document.getElementById("zh-dg-loading")?.remove();
+      ensureSidePanel();
       document.querySelectorAll("#zh-dg-side .zh-dg-widget").forEach((w) => {
         const h = w.querySelector("h3");
         if (h && /快捷入口/.test(h.textContent || "")) w.remove();
       });
-      let hot = document.getElementById("zh-dg-hotlist");
-      if (!hot) {
-        const hotWidget = [...document.querySelectorAll("#zh-dg-side .zh-dg-widget")].find((w) =>
-          /热门榜单/.test(w.querySelector("h3")?.textContent || "")
-        );
-        if (hotWidget) {
-          const list = document.createElement("div");
-          list.className = "zh-dg-hotlist";
-          list.id = "zh-dg-hotlist";
-          list.innerHTML = `<div class="zh-dg-hotempty">加载热榜中…</div>`;
-          const link = hotWidget.querySelector("a.zh-dg-sbtn");
-          if (link) hotWidget.insertBefore(list, link);
-          else hotWidget.appendChild(list);
-          hot = list;
-        }
-      }
+      const hot = document.getElementById("zh-dg-hotlist");
       if (hot && !hot.querySelector(".zh-dg-hotitem")) loadHotList();
       ensureScraper();
+      placeSideBelowHeader();
       layoutCols();
       return;
     }
@@ -2089,22 +2171,17 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       <div id="zh-dg-status">正在重建信息流…</div>
       <div id="zh-dg-grid"></div>
       <div id="zh-dg-sentinel"></div>
-    </div>
-    <aside id="zh-dg-side">
-      <div class="zh-dg-widget"><h3>创作中心</h3>
-        <a class="zh-dg-sbtn primary" href="https://www.zhihu.com/creator">进入创作中心</a>
-        <a class="zh-dg-sbtn ghost" href="https://www.zhihu.com/question/waiting">等待收录</a></div>
-      <div class="zh-dg-widget"><h3>热门榜单</h3>
-        <div class="zh-dg-hotlist" id="zh-dg-hotlist"><div class="zh-dg-hotempty">加载热榜中…</div></div>
-        <a class="zh-dg-sbtn ghost" href="https://www.zhihu.com/hot" target="_blank" rel="noopener">查看完整榜单</a></div>
-    </aside>`;
+    </div>`;
 
     const host = document.querySelector(".App-main") || document.body;
     host.prepend(shell);
+    ensureSidePanel();
     ensureScraper();
     bindCardEvents(shell);
-    loadHotList();
-    requestAnimationFrame(layoutCols);
+    requestAnimationFrame(() => {
+      placeSideBelowHeader();
+      layoutCols();
+    });
   }
 
   function parseHotItem(entry, idx) {
@@ -2729,10 +2806,42 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     }
     ensureShell();
     ensureScraper();
+    placeSideBelowHeader();
     harvestSourceEls();
     render(fromDom());
     linkNativeActions();
     ensurePendingSlots();
+  }
+
+  const IMG_SAT_KEY = "zh-dg-img-sat";
+  const IMG_SAT_STEPS = [1, 0.5, 0];
+
+  function getImgSat() {
+    try {
+      const v = Number(localStorage.getItem(IMG_SAT_KEY));
+      if (v === 1 || v === 0.5 || v === 0) return v;
+    } catch (_) {}
+    return 1;
+  }
+
+  function applyImgSat(v) {
+    const sat = v === 0.5 || v === 0 || v === 1 ? v : 1;
+    const root = document.body || document.documentElement;
+    root.style.setProperty("--dg-img-sat", String(sat));
+    if (document.body && document.documentElement !== document.body) {
+      document.documentElement.style.setProperty("--dg-img-sat", String(sat));
+    }
+  }
+
+  function cycleImgSat() {
+    const cur = getImgSat();
+    const i = IMG_SAT_STEPS.indexOf(cur);
+    const next = IMG_SAT_STEPS[(i < 0 ? 0 : i + 1) % IMG_SAT_STEPS.length];
+    try {
+      localStorage.setItem(IMG_SAT_KEY, String(next));
+    } catch (_) {}
+    applyImgSat(next);
+    return next;
   }
 
   function bootUi() {
@@ -2747,6 +2856,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     bootUi._active = true;
     injectCss();
     document.body.classList.remove("zh-dg-hide-imgs");
+    applyImgSat(getImgSat());
     ensureShell();
     sync();
     watchMessageBadge();
@@ -2781,9 +2891,19 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
           if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
           const t = ev.target;
           if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/i.test(t.tagName))) return;
+          ev.preventDefault();
+          // Shift+Q：饱和度 1 → 0.5 → 0 轮转（与显隐独立，藏图时也记住）
+          if (ev.shiftKey) {
+            const next = cycleImgSat();
+            const label = next === 1 ? "原色 100%" : next === 0.5 ? "半饱和 50%" : "灰度 0%";
+            setStatus("图片饱和度：" + label + "（Shift+Q 切换）");
+            return;
+          }
           document.body.classList.toggle("zh-dg-hide-imgs");
           const on = document.body.classList.contains("zh-dg-hide-imgs");
-          setStatus(on ? "已隐藏图片（再按 Q 显示）" : "已显示图片");
+          const sat = getImgSat();
+          const satHint = sat === 1 ? "" : sat === 0.5 ? " · 半饱和" : " · 灰度";
+          setStatus(on ? "已隐藏图片（再按 Q 显示）" + satHint : "已显示图片" + satHint);
         },
         true
       );
