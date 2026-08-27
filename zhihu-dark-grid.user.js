@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.1
-// @description  修复操作栏仅评论可用（不再搬移原站 React 节点）
+// @version      3.5.2
+// @description  操作栏改走 API 真实赞踩/喜欢/收藏，不再只亮图标
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -1752,6 +1752,8 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     title = String(title || "").trim();
     if (!title) return null;
     const key = (href || "") + "|" + title;
+    const rel = t.relationship || {};
+    const voting = Number(rel.voting);
     return {
       key,
       kind,
@@ -1763,7 +1765,10 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       votes,
       comments,
       contentHtml,
-      voted: false,
+      voted: voting === 1 || !!rel.vote_up,
+      votedDown: voting === -1 || !!rel.vote_down,
+      liked: !!(rel.is_thanked || rel.liked || rel.is_liked),
+      collected: !!rel.is_favorited,
     };
   }
 
@@ -1922,13 +1927,17 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     more: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18" cy="12" r="1.8"/></svg>',
   };
 
-  function footIconsHTML() {
+  function footIconsHTML(item) {
+    const upOn = item?.voted ? " is-on" : "";
+    const downOn = item?.votedDown ? " is-on" : "";
+    const likeOn = item?.liked ? " is-on" : "";
+    const colOn = item?.collected ? " is-on" : "";
     return `<div class="zh-dg-icons">
-      <button type="button" class="zh-dg-ico" data-proxy="vote-up" title="赞同" aria-label="赞同">${ICO.up}</button>
-      <button type="button" class="zh-dg-ico" data-proxy="vote-down" title="反对" aria-label="反对">${ICO.down}</button>
+      <button type="button" class="zh-dg-ico${upOn}" data-proxy="vote-up" title="赞同" aria-label="赞同">${ICO.up}</button>
+      <button type="button" class="zh-dg-ico${downOn}" data-proxy="vote-down" title="反对" aria-label="反对">${ICO.down}</button>
       <button type="button" class="zh-dg-ico" data-proxy="comment" title="评论" aria-label="评论">${ICO.comment}</button>
-      <button type="button" class="zh-dg-ico" data-proxy="collect" title="收藏" aria-label="收藏">${ICO.star}</button>
-      <button type="button" class="zh-dg-ico" data-proxy="like" title="喜欢" aria-label="喜欢">${ICO.heart}</button>
+      <button type="button" class="zh-dg-ico${colOn}" data-proxy="collect" title="收藏" aria-label="收藏">${ICO.star}</button>
+      <button type="button" class="zh-dg-ico${likeOn}" data-proxy="like" title="喜欢" aria-label="喜欢">${ICO.heart}</button>
       <button type="button" class="zh-dg-ico" data-proxy="share" title="分享" aria-label="分享">${ICO.share}</button>
       <button type="button" class="zh-dg-ico" data-proxy="more" title="更多" aria-label="更多">${ICO.more}</button>
     </div>`;
@@ -2111,51 +2120,225 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       return;
     }
 
-    const bar = ensureNativeBar(item);
-    let nativeBtn = findNativeBtn(bar, kind);
-
-    if (!nativeBtn) {
-      // 等一帧再试（展开全文后异步挂载）
-      await new Promise((r) => setTimeout(r, 120));
-      const bar2 = ensureNativeBar(item);
-      nativeBtn = findNativeBtn(bar2, kind);
+    // 赞 / 踩 / 喜欢 / 收藏：走 API，避免假亮图标
+    if (kind === "vote-up") {
+      await setVote(item, item.voted ? "neutral" : "up", card);
+      return;
     }
-
-    if (!nativeBtn) {
-      if (kind === "vote-up") {
-        await toggleVote(item, proxyBtn);
+    if (kind === "vote-down") {
+      await setVote(item, item.votedDown ? "neutral" : "down", card);
+      return;
+    }
+    if (kind === "like") {
+      await toggleThank(item, proxyBtn);
+      return;
+    }
+    if (kind === "collect") {
+      await quickCollect(item, proxyBtn);
+      return;
+    }
+    if (kind === "share") {
+      try {
+        await navigator.clipboard.writeText(item.href || location.href);
+        setStatus("已复制分享链接");
+      } catch (_) {
+        window.open(item.href, "_blank", "noopener");
+        setStatus("已打开原文（可手动分享）");
+      }
+      return;
+    }
+    if (kind === "more") {
+      // 「更多」依赖原站菜单：浮起真实操作栏供用户点选
+      const bar = ensureNativeBar(item);
+      if (!bar) {
+        window.open(item.href, "_blank", "noopener");
+        setStatus("已打开原文");
         return;
       }
-      setStatus("暂未找到原站对应按钮，稍后重试或展开原卡片");
+      floatNativeBar(bar, proxyBtn);
+      setStatus("已唤起原站操作栏，请点击其中的菜单项");
+      const onDoc = (ev) => {
+        if (
+          ev.target.closest?.(
+            ".zh-dg-native-live, .Popover-content, [class*='Popover'], .Menu, [class*='Favlist'], [class*='Modal'], [data-proxy='more']"
+          )
+        ) {
+          return;
+        }
+        clearNativeLive(bar);
+        document.removeEventListener("click", onDoc, true);
+      };
+      setTimeout(() => document.addEventListener("click", onDoc, true), 0);
       return;
     }
+  }
 
-    const needMenu = kind === "more" || kind === "collect" || kind === "share";
-    const liveBar = nativeBtn.closest(ACTION_BAR_SEL) || bar;
-    if (needMenu) floatNativeBar(liveBar, proxyBtn);
+  function syncVoteIcons(card, item) {
+    if (!card) return;
+    card.querySelector('[data-proxy="vote-up"]')?.classList.toggle("is-on", !!item.voted);
+    card.querySelector('[data-proxy="vote-down"]')?.classList.toggle("is-on", !!item.votedDown);
+  }
 
-    const ok = dispatchRealClick(nativeBtn);
-    if (!ok) {
-      setStatus("操作失败：无法触发原站按钮");
-      clearNativeLive(liveBar);
+  function votersUrl(item) {
+    if (item.kind === "article") return `https://www.zhihu.com/api/v4/articles/${item.id}/voters`;
+    if (item.kind === "zvideo") return `https://www.zhihu.com/api/v4/zvideos/${item.id}/voters`;
+    return `https://www.zhihu.com/api/v4/answers/${item.id}/voters`;
+  }
+
+  async function setVote(item, type, card) {
+    if (!item?.id || !["answer", "article", "zvideo"].includes(item.kind)) {
+      setStatus("当前类型暂不支持投票");
       return;
     }
-    if (kind === "vote-up") proxyBtn?.classList.add("is-on");
-    if (kind === "vote-down") card.querySelector('[data-proxy="vote-up"]')?.classList.remove("is-on");
-    if (kind === "like" || kind === "collect") proxyBtn?.classList.toggle("is-on");
+    const prevUp = !!item.voted;
+    const prevDown = !!item.votedDown;
+    try {
+      await apiFetch(votersUrl(item), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      });
+      item.voted = type === "up";
+      item.votedDown = type === "down";
+      let n = Number(item.votes);
+      if (Number.isFinite(n)) {
+        if (prevUp && type !== "up") n -= 1;
+        if (!prevUp && type === "up") n += 1;
+        item.votes = Math.max(0, n);
+      }
+      syncVoteIcons(card, item);
+      setStatus(
+        type === "up" ? "已赞同" : type === "down" ? "已反对" : prevUp ? "已取消赞同" : "已取消反对"
+      );
+    } catch (e) {
+      setStatus("投票失败：" + (e && e.message || e));
+    }
+  }
 
-    if (!needMenu) {
-      setTimeout(() => clearNativeLive(liveBar), 350);
+  async function toggleThank(item, btn) {
+    if (!item?.id || !["answer", "article", "zvideo"].includes(item.kind)) {
+      setStatus("当前类型暂不支持喜欢");
       return;
     }
-    const onDoc = (ev) => {
-      if (ev.target.closest?.(".zh-dg-native-live, .Popover-content, [class*='Popover'], .Menu, [class*='Favlist'], [class*='Modal']")) {
+    const paths =
+      item.kind === "article"
+        ? [
+            `https://www.zhihu.com/api/v4/articles/${item.id}/likers`,
+            `https://www.zhihu.com/api/v4/articles/${item.id}/thankers`,
+          ]
+        : item.kind === "zvideo"
+          ? [`https://www.zhihu.com/api/v4/zvideos/${item.id}/likers`]
+          : [
+              `https://www.zhihu.com/api/v4/answers/${item.id}/thankers`,
+              `https://www.zhihu.com/api/v4/answers/${item.id}/likers`,
+            ];
+    const wantOn = !item.liked;
+    let lastErr = "";
+    for (const url of paths) {
+      try {
+        await apiFetch(url, {
+          method: wantOn ? "POST" : "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: wantOn ? "{}" : undefined,
+        });
+        item.liked = wantOn;
+        btn?.classList.toggle("is-on", wantOn);
+        setStatus(wantOn ? "已喜欢" : "已取消喜欢");
+        return;
+      } catch (e) {
+        lastErr = String(e && e.message || e);
+      }
+    }
+    // reaction 备用
+    try {
+      const resType = item.kind === "article" ? "article" : item.kind === "zvideo" ? "zvideo" : "answer";
+      await apiFetch("https://www.zhihu.com/api/v4/zreaction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content_type: resType,
+          content_id: String(item.id),
+          action: wantOn ? "like" : "cancel_like",
+        }),
+      });
+      item.liked = wantOn;
+      btn?.classList.toggle("is-on", wantOn);
+      setStatus(wantOn ? "已喜欢" : "已取消喜欢");
+    } catch (e) {
+      setStatus("喜欢失败：" + (lastErr || e.message || e));
+    }
+  }
+
+  async function quickCollect(item, btn) {
+    if (!item?.id) {
+      setStatus("无法收藏：缺少内容 ID");
+      return;
+    }
+    const contentType =
+      item.kind === "article" ? "article" : item.kind === "zvideo" ? "zvideo" : "answer";
+    try {
+      const list = await apiFetch(
+        "https://www.zhihu.com/api/v4/collections/all?offset=0&limit=20"
+      );
+      const cols = list?.data || [];
+      if (!cols.length) {
+        setStatus("没有可用收藏夹，请先在知乎创建收藏夹");
         return;
       }
-      clearNativeLive(liveBar);
-      document.removeEventListener("click", onDoc, true);
-    };
-    setTimeout(() => document.addEventListener("click", onDoc, true), 0);
+      const fav = cols.find((c) => c.is_default) || cols[0];
+      const favId = fav.id || fav.collection?.id;
+      if (!favId) throw new Error("收藏夹 ID 无效");
+
+      const attempts = [
+        {
+          url: `https://www.zhihu.com/api/v4/collections/${favId}/contents`,
+          body: { content_id: Number(item.id) || item.id, content_type: contentType },
+        },
+        {
+          url: `https://www.zhihu.com/api/v4/collections/contents/${contentType}s/${item.id}`,
+          body: { action: "add_collection", collection_id: favId },
+        },
+        {
+          url: `https://www.zhihu.com/api/v4/favlists/${favId}/items`,
+          body: { content_id: String(item.id), content_type: contentType },
+        },
+      ];
+      let lastErr = "";
+      for (const a of attempts) {
+        try {
+          await apiFetch(a.url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(a.body),
+          });
+          item.collected = true;
+          btn?.classList.add("is-on");
+          setStatus(`已收藏到「${fav.title || fav.name || "收藏夹"}」`);
+          return;
+        } catch (e) {
+          lastErr = String(e && e.message || e);
+        }
+      }
+      throw new Error(lastErr || "收藏接口失败");
+    } catch (e) {
+      // 退回：浮起原站收藏按钮供手点
+      const bar = ensureNativeBar(item);
+      const native = findNativeBtn(bar, "collect");
+      if (bar && native) {
+        floatNativeBar(bar, btn);
+        setStatus("API 收藏失败，已唤起原站收藏栏：" + (e && e.message || e));
+        return;
+      }
+      setStatus("收藏失败：" + (e && e.message || e));
+    }
+  }
+
+  async function toggleVote(item, btn) {
+    const card = btn?.closest?.(".zh-dg-card") || findCardByKey(item.key);
+    await setVote(item, item.voted ? "neutral" : "up", card);
+    if (btn && btn.classList?.contains("zh-dg-ico") === false) {
+      btn.classList?.toggle?.("is-on", !!item.voted);
+    }
   }
 
   function cardHTML(item) {
@@ -2172,7 +2355,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
         <div class="zh-dg-full" data-full></div>
         <div class="zh-dg-hint">点击内容展开全文</div>
       </div>
-      <div class="zh-dg-foot">${footIconsHTML()}</div>
+      <div class="zh-dg-foot">${footIconsHTML(item)}</div>
       <div class="zh-dg-comments" data-comments><div class="zh-dg-cloading">加载评论中…</div></div>
     </article>`;
   }
@@ -2658,33 +2841,6 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       guard += 1;
       box.innerHTML = renderCommentsPanel(item);
       bindCommentScroll(card, item);
-    }
-  }
-
-  async function toggleVote(item, btn) {
-    if (!item.id || (item.kind !== "answer" && item.kind !== "article")) {
-      setStatus("当前类型暂不支持赞同");
-      return;
-    }
-    const type = item.voted ? "neutral" : "up";
-    const url =
-      item.kind === "article"
-        ? `https://www.zhihu.com/api/v4/articles/${item.id}/voters`
-        : `https://www.zhihu.com/api/v4/answers/${item.id}/voters`;
-    try {
-      await apiFetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
-      });
-      item.voted = !item.voted;
-      const n = Number(item.votes);
-      if (Number.isFinite(n)) item.votes = Math.max(0, n + (item.voted ? 1 : -1));
-      btn?.classList.toggle("is-on", item.voted);
-      const label = btn?.querySelector?.("[data-vote-label]");
-      if (label) label.textContent = `${fmt(item.votes)} 赞同`;
-    } catch (e) {
-      setStatus("赞同失败：" + (e && e.message || e));
     }
   }
 
