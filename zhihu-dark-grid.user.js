@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.0
-// @description  修复侧栏叠层；GitHub 自动更新；README 标明版本
+// @version      3.5.1
+// @description  修复操作栏仅评论可用（不再搬移原站 React 节点）
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -364,9 +364,9 @@ body.zh-dg-v2 [class*="PushNotifications"]{
 }
 /* 抓取容器：零尺寸，避免内部原站 DOM 把页面撑高 */
 body.zh-dg-v2 #zh-dg-scraper{
-  position:fixed!important;left:0!important;top:0!important;width:0!important;height:0!important;
+  position:fixed!important;left:0!important;top:0!important;width:360px!important;height:120px!important;
   overflow:hidden!important;opacity:0!important;pointer-events:none!important;z-index:-1!important;
-  contain:strict!important;margin:0!important;padding:0!important;border:0!important
+  contain:none!important;margin:0!important;padding:0!important;border:0!important
 }
 body.zh-dg-v2 #zh-dg-scraper *{pointer-events:none!important}
 /* 主区全宽；侧栏固定在右侧，滚到底不会变成「掉在空白里」 */
@@ -453,20 +453,29 @@ body.zh-dg-v2 #zh-dg-scraper *{pointer-events:none!important}
 .zh-dg-ico:hover{background:rgba(255,255,255,.1);color:#f0f0f0}
 .zh-dg-ico.is-on{color:#ffffff}
 .zh-dg-ico svg{width:16px;height:16px;display:block;fill:currentColor;flex-shrink:0}
-/* 原站操作栏：藏起，仅供代理点击 / 弹出层定位 */
-.zh-dg-native-slot{
-  position:fixed!important;left:-10000px!important;top:0!important;
-  width:1px!important;height:1px!important;opacity:0!important;
-  overflow:hidden!important;pointer-events:none!important;z-index:-1!important
+/* 原站操作栏：勿再搬进 slot（会打断 React）；点击时临时浮起 */
+.zh-dg-native-slot{display:none!important}
+body.zh-dg-v2 #zh-dg-scraper.zh-dg-scraper-live{
+  left:0!important;top:0!important;width:100vw!important;height:100vh!important;
+  opacity:1!important;overflow:visible!important;z-index:300400!important;
+  pointer-events:none!important;contain:none!important
 }
-.zh-dg-native-slot.is-live{
-  opacity:0.02!important;overflow:visible!important;pointer-events:auto!important;
-  z-index:300000!important;height:auto!important;min-height:36px!important
-}
-.zh-dg-native-slot .ContentItem-actions,
-.zh-dg-native-slot .RichContent-actions{
+body.zh-dg-v2 .zh-dg-native-live{
+  position:fixed!important;z-index:300500!important;opacity:1!important;
+  pointer-events:auto!important;visibility:visible!important;
   display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
-  margin:0!important;padding:0!important;background:transparent!important;border:0!important
+  background:var(--dg-overlay-2,#323232)!important;border:1px solid var(--dg-overlay-line,rgba(255,255,255,.14))!important;
+  border-radius:10px!important;padding:6px 8px!important;box-shadow:0 12px 32px rgba(0,0,0,.55)!important;
+  max-width:min(92vw,520px)!important;overflow:visible!important
+}
+body.zh-dg-v2 .zh-dg-native-live button,
+body.zh-dg-v2 .zh-dg-native-live a,
+body.zh-dg-v2 .zh-dg-native-live .Button{
+  pointer-events:auto!important;color:#e8e8e8!important
+}
+body.zh-dg-v2 #zh-dg-scraper .zh-dg-native-live,
+body.zh-dg-v2 #zh-dg-scraper .zh-dg-native-live *{
+  pointer-events:auto!important;visibility:visible!important
 }
 /* 弹出层：收藏夹 / 分享 / 更多菜单 / 消息 / 评论（勿用过宽选择器误伤顶栏） */
 body.zh-dg-v2 .Modal-wrapper,
@@ -1821,7 +1830,8 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     return out;
   }
 
-  const ACTION_BAR_SEL = ".ContentItem-actions, .RichContent-actions";
+  const ACTION_BAR_SEL =
+    ".ContentItem-actions, .RichContent-actions, [class*='ContentItem-actions'], [class*='RichContent-actions']";
 
   function findCardByKey(key) {
     return [...document.querySelectorAll("#zh-dg-grid .zh-dg-card")].find(
@@ -1831,14 +1841,18 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
 
   function findActionBar(root) {
     if (!root || !root.querySelector) return null;
-    return root.querySelector(ACTION_BAR_SEL);
+    return (
+      root.querySelector(ACTION_BAR_SEL) ||
+      root.querySelector(".VoteButton")?.closest?.("div, section, footer") ||
+      null
+    );
   }
 
   function findSourceEl(item) {
     if (!item) return null;
     if (item.sourceEl && document.contains(item.sourceEl)) return item.sourceEl;
     const scope = document.getElementById("zh-dg-scraper") || document;
-    const nodes = scope.querySelectorAll(".Card.TopstoryItem, .TopstoryItem");
+    const nodes = scope.querySelectorAll(".Card.TopstoryItem, .TopstoryItem, .ContentItem");
     for (const node of nodes) {
       if (node.classList.contains("TopstoryItem--advertCard")) continue;
       if (item.id) {
@@ -1917,80 +1931,128 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       <button type="button" class="zh-dg-ico" data-proxy="like" title="喜欢" aria-label="喜欢">${ICO.heart}</button>
       <button type="button" class="zh-dg-ico" data-proxy="share" title="分享" aria-label="分享">${ICO.share}</button>
       <button type="button" class="zh-dg-ico" data-proxy="more" title="更多" aria-label="更多">${ICO.more}</button>
-    </div>
-    <div class="zh-dg-native-slot" data-native-slot></div>`;
+    </div>`;
   }
 
   function findNativeBtn(bar, kind) {
     if (!bar) return null;
     const btns = [...bar.querySelectorAll("button, a, [role='button'], .Button")];
     const meta = (btn) => {
-      const lab = ((btn.getAttribute("aria-label") || "") + " " + (btn.textContent || "")).replace(/\s+/g, "");
+      const lab = [
+        btn.getAttribute("aria-label") || "",
+        btn.getAttribute("title") || "",
+        btn.getAttribute("data-tooltip") || "",
+        btn.textContent || "",
+      ]
+        .join(" ")
+        .replace(/\s+/g, "");
       const cls = String(btn.className || "");
       return lab + " " + cls;
     };
     const matchers = {
-      "vote-up": (s) => /VoteButton--up/.test(s) || (/赞同/.test(s) && !/反对/.test(s)),
-      "vote-down": (s) => /VoteButton--down/.test(s) || /反对/.test(s),
-      comment: (s) => /评论/.test(s) && !/关闭评论|收起评论/.test(s),
-      collect: (s) => /收藏/.test(s) || /Fav|Star|Collect/i.test(s),
-      like: (s) => /喜欢|感谢/.test(s) || /Heart|Like|Thanks/i.test(s),
-      share: (s) => /分享/.test(s) || /Share/i.test(s),
-      more: (s) => /更多/.test(s) || /OptionsButton|ActionMenu|MoreButton/i.test(s),
+      "vote-up": (s) =>
+        /VoteButton--up|VoteButton-up|is-active.*up/i.test(s) ||
+        (/赞同|upvote|VoteUp/i.test(s) && !/反对|downvote/i.test(s)),
+      "vote-down": (s) =>
+        /VoteButton--down|VoteButton-down/i.test(s) || /反对|downvote|VoteDown/i.test(s),
+      comment: (s) => /评论|Comment/i.test(s) && !/关闭评论|收起评论/.test(s),
+      collect: (s) => /收藏|Fav|Bookmark|Collect|Star/i.test(s),
+      like: (s) => /喜欢|感谢|Heart|Like|Thanks|Reaction/i.test(s),
+      share: (s) => /分享|Share/i.test(s),
+      more: (s) => /更多|Options|ActionMenu|MoreButton|Popover|ellipsis/i.test(s) || /⋯|…|\.\.\./.test(s),
     };
     const fn = matchers[kind];
     if (!fn) return null;
-    const hit = btns.find((b) => fn(meta(b)));
+    let hit = btns.find((b) => fn(meta(b)));
     if (hit) return hit;
-    // 「更多」常在最右侧且文案不稳定
+    // SVG-only 按钮：看父级 aria
+    hit = btns.find((b) => {
+      const p = b.closest("[aria-label], [title]");
+      return p && fn(meta(p));
+    });
+    if (hit) return hit;
     if (kind === "more" && btns.length) return btns[btns.length - 1];
+    if (kind === "vote-up") {
+      hit = bar.querySelector(".VoteButton--up, button.VoteButton:first-of-type, .VoteButton");
+      if (hit && !/down/i.test(hit.className)) return hit;
+    }
+    if (kind === "vote-down") {
+      hit = bar.querySelector(".VoteButton--down");
+      if (hit) return hit;
+      const votes = [...bar.querySelectorAll(".VoteButton")];
+      if (votes.length >= 2) return votes[1];
+    }
     return null;
   }
 
-  function resetNativeSlot(slot) {
-    if (!slot) return;
-    slot.classList.remove("is-live");
-    slot.style.cssText = "";
+  function restoreNativeBar(item) {
+    if (!item) return;
+    const bar = item._nativeBar;
+    const ph = item._actionsPh;
+    if (!bar || !document.contains(bar)) return;
+    // 若曾误搬到卡片 slot，尽量塞回原站占位
+    if (ph && ph.parentNode && !ph.parentNode.contains(bar)) {
+      try {
+        ph.parentNode.insertBefore(bar, ph);
+        ph.remove();
+      } catch (_) {}
+      item._actionsPh = null;
+    }
+    clearNativeLive(bar);
   }
 
-  function armNativeSlot(card, proxyBtn) {
-    const slot = card.querySelector("[data-native-slot]");
-    if (!slot) return null;
-    const anchor = proxyBtn || card.querySelector(".zh-dg-foot");
-    const r = anchor.getBoundingClientRect();
-    slot.classList.add("is-live");
-    slot.style.setProperty("left", `${Math.max(8, r.left)}px`, "important");
-    slot.style.setProperty("top", `${Math.max(8, r.bottom - 4)}px`, "important");
-    slot.style.setProperty("width", `${Math.max(40, r.width)}px`, "important");
-    return slot;
+  function clearNativeLive(bar) {
+    if (!bar) return;
+    bar.classList.remove("zh-dg-native-live");
+    if (bar._zhDgPrevStyle != null) {
+      bar.style.cssText = bar._zhDgPrevStyle;
+      bar._zhDgPrevStyle = null;
+    }
+    const scraper = document.getElementById("zh-dg-scraper");
+    scraper?.classList.remove("zh-dg-scraper-live");
+  }
+
+  function floatNativeBar(bar, proxyBtn) {
+    if (!bar) return;
+    const scraper = document.getElementById("zh-dg-scraper");
+    scraper?.classList.add("zh-dg-scraper-live");
+    if (bar._zhDgPrevStyle == null) bar._zhDgPrevStyle = bar.style.cssText;
+    const r = (proxyBtn || document.body).getBoundingClientRect();
+    const left = Math.min(Math.max(8, r.left), window.innerWidth - 280);
+    const top = Math.min(Math.max(8, r.bottom + 6), window.innerHeight - 56);
+    bar.classList.add("zh-dg-native-live");
+    bar.style.setProperty("left", left + "px", "important");
+    bar.style.setProperty("top", top + "px", "important");
+  }
+
+  function ensureNativeBar(item) {
+    if (!item) return null;
+    const src = findSourceEl(item);
+    if (src) item.sourceEl = src;
+    restoreNativeBar(item);
+    let bar = (src && findActionBar(src)) || item._nativeBar;
+    if (bar && !document.contains(bar)) bar = null;
+    if (!bar && src) {
+      // 尝试点开「阅读全文」以挂载操作栏
+      const more = src.querySelector(
+        ".ContentItem-more, .RichContent-more, button.ContentItem-expandButton, .Button.ContentItem-rightButton"
+      );
+      if (more) {
+        try {
+          more.click();
+        } catch (_) {}
+        bar = findActionBar(src);
+      }
+    }
+    if (bar) item._nativeBar = bar;
+    return bar;
   }
 
   function parkNativeActions(card, item) {
     if (!card || !item) return false;
-    const slot = card.querySelector("[data-native-slot]");
-    const foot = card.querySelector(".zh-dg-foot");
-    if (!slot || !foot) return false;
-
-    const src = findSourceEl(item);
-    if (src) item.sourceEl = src;
-
-    let bar = findActionBar(slot);
-    if (!bar && src) bar = findActionBar(src);
-    if (!bar) return false;
-
-    if (!bar.closest("[data-native-slot]")) {
-      if (!item._actionsPh) {
-        const ph = document.createElement("div");
-        ph.className = "zh-dg-actions-ph";
-        ph.style.cssText = "display:none!important";
-        bar.parentNode?.insertBefore(ph, bar);
-        item._actionsPh = ph;
-      }
-      slot.innerHTML = "";
-      slot.appendChild(bar);
-    }
-    item._nativeBar = bar;
-    return true;
+    // 不再把操作栏搬进卡片（会打断 React 事件）；只建立引用
+    const bar = ensureNativeBar(item);
+    return !!bar;
   }
 
   function linkNativeActions() {
@@ -1998,7 +2060,45 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     for (const [key, item] of store) {
       const card = findCardByKey(key);
       if (!card) continue;
+      // 把误搬进 slot 的栏迁回
+      const slot = card.querySelector("[data-native-slot]");
+      const stranded = slot?.querySelector?.(ACTION_BAR_SEL);
+      if (stranded && item) {
+        item._nativeBar = stranded;
+        restoreNativeBar(item);
+        const src = findSourceEl(item);
+        if (src && item._nativeBar && !src.contains(item._nativeBar)) {
+          const host =
+            src.querySelector(".RichContent, .ContentItem, .Card") || src;
+          try {
+            host.appendChild(item._nativeBar);
+          } catch (_) {}
+        }
+      }
       parkNativeActions(card, item);
+    }
+  }
+
+  function dispatchRealClick(el) {
+    if (!el) return false;
+    try {
+      el.focus?.({ preventScroll: true });
+    } catch (_) {}
+    const opts = { bubbles: true, cancelable: true, view: window };
+    try {
+      el.dispatchEvent(new PointerEvent("pointerdown", opts));
+      el.dispatchEvent(new MouseEvent("mousedown", opts));
+      el.dispatchEvent(new PointerEvent("pointerup", opts));
+      el.dispatchEvent(new MouseEvent("mouseup", opts));
+      el.dispatchEvent(new MouseEvent("click", opts));
+      return true;
+    } catch (_) {
+      try {
+        el.click();
+        return true;
+      } catch (__) {
+        return false;
+      }
     }
   }
 
@@ -2011,36 +2111,48 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       return;
     }
 
-    parkNativeActions(card, item);
-    const bar = item._nativeBar || findActionBar(card.querySelector("[data-native-slot]"));
-    const nativeBtn = findNativeBtn(bar, kind);
+    const bar = ensureNativeBar(item);
+    let nativeBtn = findNativeBtn(bar, kind);
+
+    if (!nativeBtn) {
+      // 等一帧再试（展开全文后异步挂载）
+      await new Promise((r) => setTimeout(r, 120));
+      const bar2 = ensureNativeBar(item);
+      nativeBtn = findNativeBtn(bar2, kind);
+    }
 
     if (!nativeBtn) {
       if (kind === "vote-up") {
         await toggleVote(item, proxyBtn);
         return;
       }
-      setStatus("暂未找到原站对应按钮，稍后重试");
+      setStatus("暂未找到原站对应按钮，稍后重试或展开原卡片");
       return;
     }
 
     const needMenu = kind === "more" || kind === "collect" || kind === "share";
-    const slot = armNativeSlot(card, proxyBtn);
-    try {
-      nativeBtn.click();
-      if (kind === "vote-up") proxyBtn?.classList.add("is-on");
-      if (kind === "vote-down") card.querySelector('[data-proxy="vote-up"]')?.classList.remove("is-on");
-    } catch (e) {
-      setStatus("操作失败：" + (e && e.message || e));
-    }
+    const liveBar = nativeBtn.closest(ACTION_BAR_SEL) || bar;
+    if (needMenu) floatNativeBar(liveBar, proxyBtn);
 
-    if (!needMenu) {
-      setTimeout(() => resetNativeSlot(slot), 400);
+    const ok = dispatchRealClick(nativeBtn);
+    if (!ok) {
+      setStatus("操作失败：无法触发原站按钮");
+      clearNativeLive(liveBar);
       return;
     }
-    // 弹出层关闭后收起定位槽
-    const onDoc = () => {
-      resetNativeSlot(slot);
+    if (kind === "vote-up") proxyBtn?.classList.add("is-on");
+    if (kind === "vote-down") card.querySelector('[data-proxy="vote-up"]')?.classList.remove("is-on");
+    if (kind === "like" || kind === "collect") proxyBtn?.classList.toggle("is-on");
+
+    if (!needMenu) {
+      setTimeout(() => clearNativeLive(liveBar), 350);
+      return;
+    }
+    const onDoc = (ev) => {
+      if (ev.target.closest?.(".zh-dg-native-live, .Popover-content, [class*='Popover'], .Menu, [class*='Favlist'], [class*='Modal']")) {
+        return;
+      }
+      clearNativeLive(liveBar);
       document.removeEventListener("click", onDoc, true);
     };
     setTimeout(() => document.addEventListener("click", onDoc, true), 0);
@@ -2806,6 +2918,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     }
     ensureShell();
     ensureScraper();
+    ensureSidePanel();
     placeSideBelowHeader();
     harvestSourceEls();
     render(fromDom());
