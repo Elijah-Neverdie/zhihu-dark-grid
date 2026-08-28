@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.2
-// @description  操作栏改走 API 真实赞踩/喜欢/收藏，不再只亮图标
+// @version      3.5.3
+// @description  浮窗遮罩持续压暗；修复圆角四角穿帮
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -580,17 +580,31 @@ body.zh-dg-v2 [class*="NotificationList"] [class*="time"],
 body.zh-dg-v2 [class*="NotificationList"] [class*="meta"]{
   color:var(--dg-mute)!important
 }
-/* Modal：评论回复等 — 背景压暗约 10% 突出悬浮窗 */
+/* Modal：评论回复等 — 遮罩持续压暗 + 圆角裁剪 */
 body.zh-dg-v2 .Modal-wrapper,
-body.zh-dg-v2 .Modal-backdrop,
-body.zh-dg-v2 [class*="Modal-backdrop"],
 body.zh-dg-v2 [class*="Modal-wrapper"]{
-  background:transparent!important
+  background:rgba(0,0,0,.58)!important;
+  backdrop-filter:none!important
 }
-/* 浮层打开时：整页压暗约 10%（遮罩低于浮层 z-index） */
+body.zh-dg-v2 .Modal-backdrop,
+body.zh-dg-v2 [class*="Modal-backdrop"]{
+  background:rgba(0,0,0,.58)!important
+}
+/* 外层方形容器透明，避免圆角四角露出底色 */
+body.zh-dg-v2 .Modal-wrapper .Modal,
+body.zh-dg-v2 .Modal-wrapper > .Modal,
+body.zh-dg-v2 [class*="Modal-wrapper"] [class*="Modal-modal"]{
+  background:transparent!important;border:0!important;box-shadow:none!important
+}
+body.zh-dg-v2 .Modal-wrapper .zh-dg-painted,
+body.zh-dg-v2 [class*="Modal-wrapper"] > .zh-dg-painted,
+body.zh-dg-v2 [class*="Modal-wrapper"] [class*="Modal-modal"].zh-dg-painted,
+body.zh-dg-v2 [class*="Modal-wrapper"] .Modal.zh-dg-painted{
+  background:transparent!important;background-image:none!important
+}
 body.zh-dg-v2.zh-dg-overlay-open::before{
   content:"";position:fixed;inset:0;z-index:299000;
-  background:rgba(0,0,0,.1);pointer-events:none
+  background:rgba(0,0,0,.12);pointer-events:none
 }
 body.zh-dg-v2 .Modal-inner,
 body.zh-dg-v2 .Modal-content,
@@ -600,7 +614,13 @@ body.zh-dg-v2 [class*="Modal-inner"],
 body.zh-dg-v2 [role="dialog"]{
   background:var(--dg-overlay)!important;color:var(--dg-text)!important;
   border:1px solid var(--dg-overlay-line)!important;
-  box-shadow:0 20px 56px rgba(0,0,0,.72)!important;border-radius:12px!important
+  box-shadow:0 20px 56px rgba(0,0,0,.72)!important;
+  border-radius:12px!important;overflow:hidden!important;isolation:isolate!important
+}
+body.zh-dg-v2 .Modal-inner > *,
+body.zh-dg-v2 [class*="Modal-inner"] > *,
+body.zh-dg-v2 [class*="Modal-modal"] > *{
+  border-radius:0!important
 }
 body.zh-dg-v2 .Modal-header,
 body.zh-dg-v2 .Modal-title,
@@ -670,6 +690,7 @@ body.zh-dg-v2 [role="dialog"] input{
   border:1px solid var(--dg-line)!important
 }
 body.zh-dg-v2 .Modal-wrapper .zh-dg-painted,
+body.zh-dg-v2 [class*="Modal-wrapper"] .zh-dg-painted,
 body.zh-dg-v2 [role="dialog"] .zh-dg-painted,
 body.zh-dg-v2 .Popover-content .zh-dg-painted,
 body.zh-dg-v2 [class*="PushNotifications"] .zh-dg-painted,
@@ -1548,7 +1569,16 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
 
   function paintOverlaySurfaces(root) {
     if (!root || root.nodeType !== 1) return;
-    const nodes = [root, ...root.querySelectorAll("*")];
+    let nodes;
+    if (root.matches?.(".Modal-wrapper, [class*='Modal-wrapper']")) {
+      const panel = root.querySelector(
+        ".Modal-inner, [class*='Modal-inner'], [class*='Modal-modal'], [role='dialog']"
+      );
+      if (!panel) return;
+      nodes = [panel, ...panel.querySelectorAll("*")];
+    } else {
+      nodes = [root, ...root.querySelectorAll("*")];
+    }
     for (let i = 0; i < nodes.length; i++) {
       const el = nodes[i];
       if (!el || el.nodeType !== 1) continue;
@@ -1598,16 +1628,27 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       return;
     }
     let open = false;
-    const modals = document.querySelectorAll(
-      '.Modal-wrapper, .Modal-inner, [class*="Modal-modal"], [role="dialog"]'
-    );
-    for (const el of modals) {
+    // 优先：全屏 Modal 遮罩（评论弹层）
+    const wrappers = document.querySelectorAll(".Modal-wrapper, [class*='Modal-wrapper']");
+    for (const el of wrappers) {
       if (!isVisibleOverlayEl(el)) continue;
-      // 只要全屏遮罩或足够大的弹层
       const r = el.getBoundingClientRect();
-      if (r.height > 160 && r.width > 200) {
+      if (r.width > window.innerWidth * 0.5 && r.height > window.innerHeight * 0.3) {
         open = true;
         break;
+      }
+    }
+    if (!open) {
+      const modals = document.querySelectorAll(
+        '.Modal-inner, [class*="Modal-modal"], [class*="Modal-content"], [role="dialog"]'
+      );
+      for (const el of modals) {
+        if (!isVisibleOverlayEl(el)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.height > 160 && r.width > 200) {
+          open = true;
+          break;
+        }
       }
     }
     if (!open) {
