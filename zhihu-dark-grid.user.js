@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.5
+// @version      3.5.6
 // @description  加强浮窗压暗；修复圆角穿帮；移除内容块底部省略号
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
-// @updateURL    https://raw.githubusercontent.com/Elijah-Neverdie/zhihu-dark-grid/master/zhihu-dark-grid.user.js
-// @downloadURL  https://raw.githubusercontent.com/Elijah-Neverdie/zhihu-dark-grid/master/zhihu-dark-grid.user.js
+// @updateURL    https://cdn.jsdelivr.net/gh/Elijah-Neverdie/zhihu-dark-grid@master/zhihu-dark-grid.user.js
+// @downloadURL  https://cdn.jsdelivr.net/gh/Elijah-Neverdie/zhihu-dark-grid@master/zhihu-dark-grid.user.js
 // @match        https://www.zhihu.com/*
 // @run-at       document-start
 // @inject-into  page
