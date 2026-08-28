@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.4
-// @description  内容块展开提示改为居中「...」
+// @version      3.5.5
+// @description  加强浮窗压暗；修复圆角穿帮；移除内容块底部省略号
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -436,8 +436,6 @@ body.zh-dg-v2 #zh-dg-scraper *{pointer-events:none!important}
   filter:saturate(var(--dg-img-sat,1));transition:filter .2s ease
 }
 .zh-dg-full p{margin:0 0 .8em}
-.zh-dg-hint{margin-top:8px;font-size:14px;color:var(--dg-mute);text-align:center;line-height:1}
-.zh-dg-card.is-expanded .zh-dg-hint{display:none}
 .zh-dg-foot{
   display:flex;align-items:center;gap:2px;padding:6px 10px 12px;
   color:var(--dg-mute);font-size:12px;position:relative;overflow:visible
@@ -581,46 +579,48 @@ body.zh-dg-v2 [class*="NotificationList"] [class*="time"],
 body.zh-dg-v2 [class*="NotificationList"] [class*="meta"]{
   color:var(--dg-mute)!important
 }
-/* Modal：评论回复等 — 遮罩持续压暗 + 圆角裁剪 */
+/* Modal：评论回复等 — 遮罩压暗 + 圆角仅作用于内层面板 */
 body.zh-dg-v2 .Modal-wrapper,
 body.zh-dg-v2 [class*="Modal-wrapper"]{
-  background:rgba(0,0,0,.58)!important;
+  background:rgba(0,0,0,.78)!important;
   backdrop-filter:none!important
 }
 body.zh-dg-v2 .Modal-backdrop,
 body.zh-dg-v2 [class*="Modal-backdrop"]{
-  background:rgba(0,0,0,.58)!important
+  background:rgba(0,0,0,.78)!important
 }
-/* 外层方形容器透明，避免圆角四角露出底色 */
 body.zh-dg-v2 .Modal-wrapper .Modal,
 body.zh-dg-v2 .Modal-wrapper > .Modal,
-body.zh-dg-v2 [class*="Modal-wrapper"] [class*="Modal-modal"]{
-  background:transparent!important;border:0!important;box-shadow:none!important
+body.zh-dg-v2 .Modal-wrapper > div,
+body.zh-dg-v2 [class*="Modal-wrapper"] [class*="Modal-modal"],
+body.zh-dg-v2 [class*="Modal-wrapper"] [role="dialog"]{
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  border-radius:0!important;overflow:visible!important
 }
 body.zh-dg-v2 .Modal-wrapper .zh-dg-painted,
 body.zh-dg-v2 [class*="Modal-wrapper"] > .zh-dg-painted,
 body.zh-dg-v2 [class*="Modal-wrapper"] [class*="Modal-modal"].zh-dg-painted,
-body.zh-dg-v2 [class*="Modal-wrapper"] .Modal.zh-dg-painted{
+body.zh-dg-v2 [class*="Modal-wrapper"] .Modal.zh-dg-painted,
+body.zh-dg-v2 [class*="Modal-wrapper"] [role="dialog"].zh-dg-painted{
   background:transparent!important;background-image:none!important
 }
-body.zh-dg-v2.zh-dg-overlay-open::before{
-  content:"";position:fixed;inset:0;z-index:299000;
-  background:rgba(0,0,0,.12);pointer-events:none
+body.zh-dg-v2.zh-dg-overlay-open #zh-dg-shell,
+body.zh-dg-v2.zh-dg-overlay-open #zh-dg-side{
+  filter:brightness(.48);transition:filter .2s ease
 }
-body.zh-dg-v2 .Modal-inner,
-body.zh-dg-v2 .Modal-content,
-body.zh-dg-v2 [class*="Modal-modal"],
-body.zh-dg-v2 [class*="Modal-content"],
-body.zh-dg-v2 [class*="Modal-inner"],
-body.zh-dg-v2 [role="dialog"]{
+body.zh-dg-v2 .Modal-wrapper .Modal-inner,
+body.zh-dg-v2 .Modal-wrapper [class*="Modal-inner"],
+body.zh-dg-v2 .Modal-wrapper .Modal-content,
+body.zh-dg-v2 .Modal-wrapper [class*="Modal-content"]{
   background:var(--dg-overlay)!important;color:var(--dg-text)!important;
   border:1px solid var(--dg-overlay-line)!important;
   box-shadow:0 20px 56px rgba(0,0,0,.72)!important;
-  border-radius:12px!important;overflow:hidden!important;isolation:isolate!important
+  border-radius:12px!important;overflow:hidden!important;
+  clip-path:inset(0 round 12px)!important;isolation:isolate!important
 }
 body.zh-dg-v2 .Modal-inner > *,
 body.zh-dg-v2 [class*="Modal-inner"] > *,
-body.zh-dg-v2 [class*="Modal-modal"] > *{
+body.zh-dg-v2 .Modal-wrapper [class*="Modal-content"] > *{
   border-radius:0!important
 }
 body.zh-dg-v2 .Modal-header,
@@ -1568,14 +1568,69 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     return rgb.r < 90 && rgb.g < 90 && rgb.b < 90;
   }
 
+  function findModalPanel(wrapper) {
+    if (!wrapper) return null;
+    const inner = wrapper.querySelector(".Modal-inner, [class*='Modal-inner']");
+    if (inner && isVisibleOverlayEl(inner)) return inner;
+    const topbar = wrapper.querySelector(".CommentTopbar, [class*='CommentTopbar']");
+    if (topbar) {
+      let el = topbar.parentElement;
+      while (el && el !== wrapper) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 240 && r.width < window.innerWidth * 0.92 && r.height > 160) return el;
+        el = el.parentElement;
+      }
+    }
+    let best = null;
+    let bestArea = Infinity;
+    wrapper.querySelectorAll('[role="dialog"], [class*="Modal-modal"], [class*="Modal-content"]').forEach((el) => {
+      if (!isVisibleOverlayEl(el)) return;
+      const r = el.getBoundingClientRect();
+      const area = r.width * r.height;
+      if (r.width > 240 && r.width < window.innerWidth * 0.92 && area < bestArea) {
+        best = el;
+        bestArea = area;
+      }
+    });
+    return best;
+  }
+
+  function clearModalShellBg(wrapper, panel) {
+    if (!wrapper || !panel) return;
+    let node = panel.parentElement;
+    while (node && node !== wrapper) {
+      node.style.setProperty("background", "transparent", "important");
+      node.style.setProperty("background-color", "transparent", "important");
+      node.style.setProperty("background-image", "none", "important");
+      node.style.setProperty("box-shadow", "none", "important");
+      node.style.setProperty("border", "none", "important");
+      node.style.setProperty("border-radius", "0", "important");
+      node = node.parentElement;
+    }
+    panel.style.setProperty("background", "var(--dg-overlay)", "important");
+    panel.style.setProperty("border-radius", "12px", "important");
+    panel.style.setProperty("overflow", "hidden", "important");
+    panel.style.setProperty("clip-path", "inset(0 round 12px)", "important");
+    panel.style.setProperty("border", "1px solid rgba(255,255,255,.08)", "important");
+    panel.style.setProperty("box-shadow", "0 20px 56px rgba(0,0,0,.72)", "important");
+  }
+
+  function tuneModalOverlay() {
+    document.querySelectorAll(".Modal-wrapper, [class*='Modal-wrapper']").forEach((wrapper) => {
+      if (!isVisibleOverlayEl(wrapper)) return;
+      wrapper.style.setProperty("background", "rgba(0,0,0,.78)", "important");
+      const panel = findModalPanel(wrapper);
+      if (panel) clearModalShellBg(wrapper, panel);
+    });
+  }
+
   function paintOverlaySurfaces(root) {
     if (!root || root.nodeType !== 1) return;
     let nodes;
     if (root.matches?.(".Modal-wrapper, [class*='Modal-wrapper']")) {
-      const panel = root.querySelector(
-        ".Modal-inner, [class*='Modal-inner'], [class*='Modal-modal'], [role='dialog']"
-      );
+      const panel = findModalPanel(root);
       if (!panel) return;
+      clearModalShellBg(root, panel);
       nodes = [panel, ...panel.querySelectorAll("*")];
     } else {
       nodes = [root, ...root.querySelectorAll("*")];
@@ -1675,6 +1730,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     }
     try {
       syncOverlayOpenClass();
+      tuneModalOverlay();
       document.querySelectorAll(OVERLAY_ROOT_SEL).forEach(paintOverlaySurfaces);
     } catch (_) {}
   }
@@ -2395,7 +2451,6 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       <div class="zh-dg-body" data-act="expand">
         ${bodyInner}
         <div class="zh-dg-full" data-full></div>
-        <div class="zh-dg-hint">...</div>
       </div>
       <div class="zh-dg-foot">${footIconsHTML(item)}</div>
       <div class="zh-dg-comments" data-comments><div class="zh-dg-cloading">加载评论中…</div></div>
