@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.3
-// @description  浮窗遮罩持续压暗；修复圆角四角穿帮
+// @version      3.5.4
+// @description  内容块展开提示改为居中「...」
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -436,7 +436,8 @@ body.zh-dg-v2 #zh-dg-scraper *{pointer-events:none!important}
   filter:saturate(var(--dg-img-sat,1));transition:filter .2s ease
 }
 .zh-dg-full p{margin:0 0 .8em}
-.zh-dg-hint{margin-top:8px;font-size:12px;color:var(--dg-mute)}
+.zh-dg-hint{margin-top:8px;font-size:14px;color:var(--dg-mute);text-align:center;line-height:1}
+.zh-dg-card.is-expanded .zh-dg-hint{display:none}
 .zh-dg-foot{
   display:flex;align-items:center;gap:2px;padding:6px 10px 12px;
   color:var(--dg-mute);font-size:12px;position:relative;overflow:visible
@@ -2394,7 +2395,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       <div class="zh-dg-body" data-act="expand">
         ${bodyInner}
         <div class="zh-dg-full" data-full></div>
-        <div class="zh-dg-hint">点击内容展开全文</div>
+        <div class="zh-dg-hint">...</div>
       </div>
       <div class="zh-dg-foot">${footIconsHTML(item)}</div>
       <div class="zh-dg-comments" data-comments><div class="zh-dg-cloading">加载评论中…</div></div>
@@ -3039,12 +3040,8 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
           card.classList.add("is-expanded");
           const html = await loadFullContent(item);
           full.innerHTML = html || `<p>${esc(item.excerpt || "")}</p>`;
-          const hint = card.querySelector(".zh-dg-hint");
-          if (hint) hint.textContent = "再次点击内容可收起";
         } else {
           card.classList.remove("is-expanded");
-          const hint = card.querySelector(".zh-dg-hint");
-          if (hint) hint.textContent = "点击内容展开全文";
         }
       }
     });
