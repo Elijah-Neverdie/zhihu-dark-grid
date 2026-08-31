@@ -15,6 +15,7 @@
 // @grant        GM_xmlhttpRequest
 // @connect      www.zhihu.com
 // @connect      127.0.0.1
+// 架构：样式/网格核心已抽至 dark-grid-shared.user.js，供 Quora 子插件 @require；知乎脚本将逐步迁移至共享核心。
 // ==/UserScript==
 
 (function () {
