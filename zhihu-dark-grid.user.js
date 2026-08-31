@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.9
-// @description  嵌套评论抽屉暗色主题；更新源改 GitHub raw 避免 CDN 滞后
+// @version      3.5.10
+// @description  浮层灰阶与压暗背景协调；修复高亮回复深底深字不可读
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -196,9 +196,10 @@ body.zh-dg-v2{
   --dg-card:#1e1e1e;--dg-card2:#262626;--dg-line:rgba(255,255,255,.08);
   --dg-text:#e8e8e8;--dg-sub:#a3a3a3;--dg-mute:#737373;--dg-accent:#9a9a9a;
   --dg-elev:#242424;--dg-max:100%;--dg-side:280px;--dg-img-sat:1;overflow-x:hidden!important;
-  --dg-overlay:#2a2a2a;--dg-overlay-2:#323232;--dg-overlay-3:#3a3a3a;
-  --dg-overlay-line:rgba(255,255,255,.14);--dg-overlay-hover:rgba(255,255,255,.08);
-  --dg-overlay-link:#cfcfcf;--dg-overlay-link-hover:#f2f2f2
+  --dg-overlay:#3a3a3a;--dg-overlay-2:#424242;--dg-overlay-3:#4c4c4c;
+  --dg-overlay-line:rgba(255,255,255,.14);--dg-overlay-hover:rgba(255,255,255,.1);
+  --dg-overlay-link:#e0e0e0;--dg-overlay-link-hover:#ffffff;
+  --dg-overlay-body:#f0f0f0;--dg-overlay-sub:#b0b0b0;--dg-overlay-mute:#8a8a8a
 }
 body.zh-dg-v2 .AppHeader,body.zh-dg-v2 header[role=banner]{
   background:rgba(20,20,20,.96)!important;border-bottom:1px solid var(--dg-line)!important;box-shadow:none!important;
@@ -609,6 +610,56 @@ body.zh-dg-v2 [class*="Modal-wrapper"] .Modal.zh-dg-painted,
 body.zh-dg-v2 [class*="Modal-wrapper"] [role="dialog"].zh-dg-painted{
   background:transparent!important;background-image:none!important
 }
+/* 评论浮层：比压暗后的页面略亮一档灰 */
+body.zh-dg-v2 .zh-dg-comment-overlay,
+body.zh-dg-v2.zh-dg-overlay-open .Modal-wrapper .Modal-inner,
+body.zh-dg-v2.zh-dg-overlay-open .Modal-wrapper [class*="Modal-inner"],
+body.zh-dg-v2.zh-dg-overlay-open .Modal-wrapper .Modal-content,
+body.zh-dg-v2.zh-dg-overlay-open .Modal-wrapper [class*="Modal-content"],
+body.zh-dg-v2.zh-dg-overlay-open body > .Popover .Popover-content,
+body.zh-dg-v2.zh-dg-overlay-open body > .Popover [class*="Popover-content"]{
+  background:var(--dg-overlay)!important;color:var(--dg-overlay-body)!important
+}
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"],
+body.zh-dg-v2 .zh-dg-comment-overlay .CommentItemV2,
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="NestComment"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentsV2"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentList"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentBox"],
+body.zh-dg-v2 .zh-dg-comment-overlay .Card{
+  background:transparent!important;color:var(--dg-overlay-body)!important;
+  border-color:rgba(255,255,255,.06)!important;box-shadow:none!important
+}
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"].is-active,
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"]:hover,
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"][class*="highlight"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"][class*="Highlight"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"][class*="active"],
+body.zh-dg-v2 .zh-dg-comment-overlay .zh-dg-painted{
+  background:var(--dg-overlay-3)!important;color:var(--dg-overlay-body)!important
+}
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"] [class*="content"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"] p,
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="RichText"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentContent"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"] span,
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"] div{
+  color:var(--dg-overlay-body)!important
+}
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"] [class*="meta"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"] [class*="time"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"] button,
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="CommentItem"] [class*="reply"]{
+  color:var(--dg-overlay-sub)!important
+}
+body.zh-dg-v2 .zh-dg-comment-overlay a,
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="AuthorInfo"],
+body.zh-dg-v2 .zh-dg-comment-overlay [class*="UserLink"]{
+  color:var(--dg-overlay-link)!important
+}
+body.zh-dg-v2 .zh-dg-comment-overlay a:hover{
+  color:var(--dg-overlay-link-hover)!important
+}
 body.zh-dg-v2.zh-dg-overlay-open #zh-dg-layout{
   filter:brightness(.48);transition:filter .2s ease
 }
@@ -748,7 +799,7 @@ body.zh-dg-v2 body > div:has([class*="CommentTopbar"]) .zh-dg-painted,
 body.zh-dg-v2 .Popover-content .zh-dg-painted,
 body.zh-dg-v2 [class*="PushNotifications"] .zh-dg-painted,
 body.zh-dg-v2 [class*="NotificationList"] .zh-dg-painted{
-  background:var(--dg-overlay-2)!important;color:var(--dg-text)!important
+  background:var(--dg-overlay-2)!important;color:var(--dg-overlay-body)!important
 }
 /* 「…」子菜单悬停高亮 */
 body.zh-dg-v2 .Menu-item:hover,
@@ -1710,7 +1761,9 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       node.style.setProperty("border-radius", "0", "important");
       node = node.parentElement;
     }
+    panel.classList.add("zh-dg-comment-overlay");
     panel.style.setProperty("background", "var(--dg-overlay)", "important");
+    panel.style.setProperty("color", "var(--dg-overlay-body)", "important");
     panel.style.setProperty("border-radius", "12px", "important");
     panel.style.setProperty("overflow", "hidden", "important");
     panel.style.setProperty("clip-path", "inset(0 round 12px)", "important");
@@ -1745,12 +1798,54 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     return [...panels];
   }
 
-  function tuneCommentOverlay() {
+  function isMutedText(rgb) {
+    if (!rgb || rgb.a < 0.35) return false;
+    return rgb.r < 140 && rgb.g < 140 && rgb.b < 140;
+  }
+
+  function fixOverlayReadable(el, st) {
+    const bg = parseRgb(st.backgroundColor);
+    const fg = parseRgb(st.color);
+    if (isLightSurface(bg)) {
+      el.classList.add("zh-dg-painted");
+      el.style.setProperty("background-color", "var(--dg-overlay-2)", "important");
+      el.style.setProperty("background-image", "none", "important");
+      el.style.setProperty("color", "var(--dg-overlay-body)", "important");
+      const bc = parseRgb(st.borderColor);
+      if (bc && bc.r > 200 && bc.g > 200 && bc.b > 200) {
+        el.style.setProperty("border-color", "rgba(255,255,255,.08)", "important");
+      }
+      return;
+    }
+    if (bg && bg.a > 0.25 && bg.r < 120 && bg.g < 120 && bg.b < 120) {
+      if (!fg || isDarkText(fg) || isMutedText(fg)) {
+        el.style.setProperty("color", "var(--dg-overlay-body)", "important");
+      }
+    }
+  }
+
+  function markCommentOverlayPanels() {
+    document.querySelectorAll(".zh-dg-comment-overlay").forEach((el) => {
+      el.classList.remove("zh-dg-comment-overlay");
+    });
     findCommentOverlayPanels().forEach((panel) => {
-      const inModal = panel.closest(".Modal-wrapper, [class*='Modal-wrapper']");
-      if (inModal && isVisibleOverlayEl(inModal)) return;
+      panel.classList.add("zh-dg-comment-overlay");
       panel.style.setProperty("background", "var(--dg-overlay)", "important");
-      panel.style.setProperty("color", "var(--dg-text)", "important");
+      panel.style.setProperty("color", "var(--dg-overlay-body)", "important");
+    });
+    document.querySelectorAll(".Modal-wrapper .Modal-inner, .Modal-wrapper [class*='Modal-inner'], .Modal-wrapper [class*='Modal-content']").forEach((el) => {
+      if (!isVisibleOverlayEl(el)) return;
+      if (el.querySelector(".CommentTopbar, [class*='CommentTopbar'], [class*='CommentsV2']")) {
+        el.classList.add("zh-dg-comment-overlay");
+      }
+    });
+  }
+
+  function tuneCommentOverlay() {
+    markCommentOverlayPanels();
+    findCommentOverlayPanels().forEach((panel) => {
+      panel.style.setProperty("background", "var(--dg-overlay)", "important");
+      panel.style.setProperty("color", "var(--dg-overlay-body)", "important");
       panel.style.setProperty("border-radius", "12px", "important");
       panel.style.setProperty("overflow", "hidden", "important");
       panel.style.setProperty("border", "1px solid rgba(255,255,255,.08)", "important");
@@ -1763,6 +1858,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
         }
         p = p.parentElement;
       }
+      paintOverlaySurfaces(panel);
     });
     document.querySelectorAll("body > .Popover, body > div > .Popover").forEach((pop) => {
       if (!pop.querySelector(".CommentTopbar, [class*='CommentTopbar']")) return;
@@ -1770,10 +1866,12 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       pop.style.setProperty("background", "rgba(0,0,0,.78)", "important");
       const content = pop.querySelector(".Popover-content, [class*='Popover-content']");
       if (content) {
+        content.classList.add("zh-dg-comment-overlay");
         content.style.setProperty("background", "var(--dg-overlay)", "important");
-        content.style.setProperty("color", "var(--dg-text)", "important");
+        content.style.setProperty("color", "var(--dg-overlay-body)", "important");
         content.style.setProperty("border-radius", "12px", "important");
         content.style.setProperty("overflow", "hidden", "important");
+        paintOverlaySurfaces(content);
       }
     });
   }
@@ -1805,15 +1903,9 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       }
       const bg = parseRgb(st.backgroundColor);
       if (isLightSurface(bg)) {
-        el.classList.add("zh-dg-painted");
-        el.style.setProperty("background-color", "#262626", "important");
-        el.style.setProperty("background-image", "none", "important");
-        const fg = parseRgb(st.color);
-        if (isDarkText(fg)) el.style.setProperty("color", "#e8e8e8", "important");
-        const bc = parseRgb(st.borderColor);
-        if (bc && bc.r > 200 && bc.g > 200 && bc.b > 200) {
-          el.style.setProperty("border-color", "rgba(255,255,255,.08)", "important");
-        }
+        fixOverlayReadable(el, st);
+      } else if (el.closest?.(".zh-dg-comment-overlay, .Modal-wrapper, [class*='Modal-wrapper'], [role='dialog'], .Popover-content")) {
+        fixOverlayReadable(el, st);
       }
     }
   }
