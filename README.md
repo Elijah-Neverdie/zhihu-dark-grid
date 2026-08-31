@@ -1,6 +1,6 @@
 # 知乎暗色网格油猴脚本
 
-**当前版本：`3.5.8`**
+**当前版本：`3.5.9`**
 
 将知乎首页重排为深灰多列瀑布流信息流（类似小红书），支持无限加载、展开全文、评论回复与赞同。
 
@@ -34,6 +34,7 @@ https://raw.githubusercontent.com/Elijah-Neverdie/zhihu-dark-grid/master/zhihu-d
 
 | 版本 | 说明 |
 |------|------|
+| 3.5.9 | `@updateURL` 改 GitHub raw，避免 jsDelivr 缓存导致检测不到新版本 |
 | 3.5.8 | 嵌套评论/「返回评论」抽屉统一暗色主题 |
 | 3.5.7 | 信息流与侧栏改 flex 双栏强分离；修复评论浮层打开时侧栏交叠 |
 | 3.5.6 | 更新源改 jsDelivr，修复 Tampermonkey 检测不到新版本 |
