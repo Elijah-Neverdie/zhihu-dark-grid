@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.8
-// @description  嵌套评论/返回评论抽屉统一暗色主题
+// @version      3.5.9
+// @description  嵌套评论抽屉暗色主题；更新源改 GitHub raw 避免 CDN 滞后
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
-// @updateURL    https://cdn.jsdelivr.net/gh/Elijah-Neverdie/zhihu-dark-grid@master/zhihu-dark-grid.user.js
-// @downloadURL  https://cdn.jsdelivr.net/gh/Elijah-Neverdie/zhihu-dark-grid@master/zhihu-dark-grid.user.js
+// @updateURL    https://raw.githubusercontent.com/Elijah-Neverdie/zhihu-dark-grid/master/zhihu-dark-grid.user.js
+// @downloadURL  https://raw.githubusercontent.com/Elijah-Neverdie/zhihu-dark-grid/master/zhihu-dark-grid.user.js
 // @match        https://www.zhihu.com/*
 // @run-at       document-start
 // @inject-into  page
