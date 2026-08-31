@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.6
-// @description  加强浮窗压暗；修复圆角穿帮；移除内容块底部省略号
+// @version      3.5.7
+// @description  信息流与侧栏 flex 强分离；修复评论浮层打开时侧栏交叠
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -334,18 +334,20 @@ body.zh-dg-v2 .Footer,body.zh-dg-v2 footer,body.zh-dg-v2 .CornerButtons,body.zh-
 body.zh-dg-v2 .Topstory,body.zh-dg-v2 .Topstory-mainColumn,body.zh-dg-v2 .TopstoryMain,
 body.zh-dg-v2 .App-main .Sticky,body.zh-dg-v2 .App-main [class*="GlobalSideBar"],
 body.zh-dg-v2 .App-main [class*="Topstory-side"],body.zh-dg-v2 .App-main [class*="SideBar"]:not(#zh-dg-side),
-body.zh-dg-v2 .App-main [class*="Sidebar"]:not(#zh-dg-side){
+body.zh-dg-v2 .App-main [class*="Sidebar"]:not(#zh-dg-side),
+body.zh-dg-v2 #root [class*="GlobalSideBar"]:not(#zh-dg-side),
+body.zh-dg-v2 #root [class*="Topstory-side"]:not(#zh-dg-side){
   position:fixed!important;left:-10000px!important;top:0!important;width:1px!important;height:1px!important;
   max-height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;
   margin:0!important;padding:0!important;border:0!important
 }
-/* 首页改造态：App-main 内只留自建 shell（消息/通知浮层一般挂在 body，不受影响） */
-body.zh-dg-v2 .App-main > *:not(#zh-dg-shell){
+/* 首页改造态：App-main 内只留自建 layout（消息/通知浮层一般挂在 body，不受影响） */
+body.zh-dg-v2 .App-main > *:not(#zh-dg-layout){
   position:fixed!important;left:-10000px!important;top:0!important;width:1px!important;height:1px!important;
   max-height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;
   margin:0!important;padding:0!important;border:0!important;visibility:hidden!important
 }
-body.zh-dg-v2 .App-main > #zh-dg-shell{
+body.zh-dg-v2 .App-main > #zh-dg-layout{
   position:relative!important;left:auto!important;top:auto!important;width:auto!important;height:auto!important;
   max-height:none!important;overflow:visible!important;opacity:1!important;pointer-events:auto!important;
   visibility:visible!important;margin:12px auto 48px!important
@@ -369,11 +371,14 @@ body.zh-dg-v2 #zh-dg-scraper{
   contain:none!important;margin:0!important;padding:0!important;border:0!important
 }
 body.zh-dg-v2 #zh-dg-scraper *{pointer-events:none!important}
-/* 主区全宽；侧栏固定在右侧，滚到底不会变成「掉在空白里」 */
+/* 主区 + 侧栏：flex 双栏强分离（避免 fixed 侧栏在浮层 transform 下叠到网格上） */
+#zh-dg-layout{
+  display:flex;align-items:flex-start;gap:16px;width:100%;max-width:var(--dg-max);
+  margin:0 auto;padding:0 20px 48px;box-sizing:border-box
+}
 #zh-dg-shell{
-  max-width:var(--dg-max);margin:12px auto 48px;padding:0 20px 48px;
-  display:block;box-sizing:border-box;
-  padding-right:calc(var(--dg-side) + 36px)
+  flex:1 1 auto;min-width:0;width:auto;max-width:none;margin:0;padding:0;
+  display:block;box-sizing:border-box
 }
 #zh-dg-main{min-width:0;width:100%}
 #zh-dg-status{color:var(--dg-mute);font-size:12px;margin-bottom:8px;min-height:18px}
@@ -604,8 +609,7 @@ body.zh-dg-v2 [class*="Modal-wrapper"] .Modal.zh-dg-painted,
 body.zh-dg-v2 [class*="Modal-wrapper"] [role="dialog"].zh-dg-painted{
   background:transparent!important;background-image:none!important
 }
-body.zh-dg-v2.zh-dg-overlay-open #zh-dg-shell,
-body.zh-dg-v2.zh-dg-overlay-open #zh-dg-side{
+body.zh-dg-v2.zh-dg-overlay-open #zh-dg-layout{
   filter:brightness(.48);transition:filter .2s ease
 }
 body.zh-dg-v2 .Modal-wrapper .Modal-inner,
@@ -789,11 +793,12 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
 .zh-dg-pending.is-hidden{display:none!important}
 @keyframes zhDgShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 #zh-dg-side{
-  position:fixed!important;top:88px!important;right:16px!important;width:var(--dg-side);
+  position:sticky!important;top:var(--dg-side-top,88px)!important;
+  flex:0 0 var(--dg-side)!important;width:var(--dg-side)!important;
   display:flex!important;flex-direction:column;gap:12px;
-  max-height:calc(100vh - 104px);overflow:auto;z-index:40!important;
-  box-sizing:border-box;pointer-events:auto;isolation:isolate;
-  transform:translateZ(0);contain:layout style
+  max-height:calc(100vh - var(--dg-side-top, 88px) - 16px);overflow:auto;
+  z-index:2!important;box-sizing:border-box;pointer-events:auto;
+  align-self:flex-start
 }
 .zh-dg-widget{
   background:var(--dg-card)!important;border:1px solid var(--dg-line)!important;
@@ -828,8 +833,8 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
 .zh-dg-hotempty{font-size:12px;color:var(--dg-mute);padding:4px 0 8px}
 #zh-dg-sentinel{height:32px;width:100%}
 @media(max-width:900px){
-  #zh-dg-shell{padding-right:20px}
-  #zh-dg-side{display:none}
+  #zh-dg-layout{padding:0 20px 48px}
+  #zh-dg-side{display:none!important}
 }
 `;
 
@@ -983,26 +988,73 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     });
   }
 
+  function ensureLayout() {
+    let layout = document.getElementById("zh-dg-layout");
+    const host = document.querySelector(".App-main") || document.body;
+    const shell = document.getElementById("zh-dg-shell");
+    if (!layout) {
+      layout = document.createElement("div");
+      layout.id = "zh-dg-layout";
+      if (shell?.parentElement) {
+        shell.parentElement.insertBefore(layout, shell);
+        layout.appendChild(shell);
+      } else {
+        host.prepend(layout);
+      }
+    } else if (host !== document.body && layout.parentElement !== host && !host.contains(layout)) {
+      host.prepend(layout);
+    }
+    return layout;
+  }
+
   function placeSideBelowHeader() {
-    let side = document.getElementById("zh-dg-side");
+    const side = document.getElementById("zh-dg-side");
+    if (!side) return;
+    const layout = ensureLayout();
+    if (side.parentElement !== layout) layout.appendChild(side);
     const header =
       document.querySelector(".AppHeader") ||
       document.querySelector("header[role=banner]") ||
       document.querySelector("header");
-    if (!side) return;
-    // 必须挂在 body：留在 App-main/shell 里时，原站 transform/filter 会让 fixed 错位叠到网格上
-    if (side.parentElement !== document.body) {
-      document.body.appendChild(side);
-    }
-    side.style.setProperty("position", "fixed", "important");
-    side.style.setProperty("right", "16px", "important");
-    side.style.setProperty("left", "auto", "important");
-    side.style.setProperty("display", "flex", "important");
-    side.style.setProperty("z-index", "40", "important");
     const bottom = header ? header.getBoundingClientRect().bottom : 64;
     const top = Math.max(72, Math.ceil(bottom + 10));
-    side.style.setProperty("top", top + "px", "important");
-    side.style.setProperty("max-height", `calc(100vh - ${top + 16}px)`, "important");
+    const topPx = top + "px";
+    document.documentElement.style.setProperty("--dg-side-top", topPx);
+    document.body?.style.setProperty("--dg-side-top", topPx);
+    // 清掉旧版 fixed 侧栏内联样式，避免叠到网格上
+    ["position", "right", "left", "top", "max-height", "z-index", "transform"].forEach((k) => {
+      side.style.removeProperty(k);
+    });
+  }
+
+  function isNativeSidebarLike(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.id === "zh-dg-side" || el.closest("#zh-dg-layout, #zh-dg-scraper")) return false;
+    if (el.closest(".Modal-wrapper, [class*='Modal-wrapper'], [role='dialog'], .Popover-content, [class*='Popover-content']")) {
+      return false;
+    }
+    const t = (el.textContent || "").replace(/\s+/g, " ").trim();
+    if (t.length > 400 || t.length < 8) return false;
+    const hitCreator = t.includes("创作中心") && (t.includes("进入创作中心") || t.includes("草稿"));
+    const hitHot = (t.includes("热榜") || t.includes("热门榜单")) && /\d+\s*万热度|\d+\s*热度/.test(t);
+    return hitCreator || hitHot;
+  }
+
+  function purgeStraySidebars(scraper) {
+    if (!scraper) return;
+    const roots = [document.body, document.querySelector(".App-main"), document.querySelector("#root")].filter(Boolean);
+    roots.forEach((root) => {
+      root.querySelectorAll("div.Card, section, aside, div[class*='SideBar'], div[class*='Sidebar']").forEach((el) => {
+        if (!isNativeSidebarLike(el)) return;
+        const r = el.getBoundingClientRect?.();
+        if (r && r.width > 420) return;
+        if (!scraper.contains(el)) {
+          try {
+            scraper.appendChild(el);
+          } catch (_) {}
+        }
+      });
+    });
   }
 
   function parkNativeSidebars(scraper) {
@@ -1027,7 +1079,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     sels.forEach((sel) => {
       document.querySelectorAll(sel).forEach((el) => {
         if (!el || el.id === "zh-dg-side") return;
-        if (el.closest("#zh-dg-shell") || el.closest("#zh-dg-side") || el.closest("#zh-dg-scraper")) return;
+        if (el.closest("#zh-dg-layout, #zh-dg-shell, #zh-dg-side, #zh-dg-scraper")) return;
         if (el.closest?.(".Popover-content, [class*='Popover-content'], [role='dialog'], [role='menu']")) return;
         if (!scraper.contains(el)) {
           try {
@@ -1036,11 +1088,12 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
         }
       });
     });
+    purgeStraySidebars(scraper);
     // 原站晚注入的「创作中心 / 热榜」卡片（无稳定 class）
     const main = document.querySelector(".App-main");
     if (!main) return;
     main.querySelectorAll("div.Card, section, aside").forEach((el) => {
-      if (!el || el.closest("#zh-dg-shell, #zh-dg-side, #zh-dg-scraper")) return;
+      if (!el || el.closest("#zh-dg-layout, #zh-dg-shell, #zh-dg-side, #zh-dg-scraper")) return;
       if (el.closest?.(".Popover-content, [class*='Popover-content'], [role='dialog']")) return;
       const t = (el.textContent || "").replace(/\s+/g, " ").trim();
       if (t.length > 400) return;
@@ -1105,6 +1158,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
         "[role='menu']",
         "[role='dialog']",
         "[role='listbox']",
+        "#zh-dg-layout",
         "#zh-dg-shell",
         "#zh-dg-side",
       ].join(",")
@@ -1129,7 +1183,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     const keep = (el) => {
       if (!el || el.nodeType !== 1) return true;
       if (el === header || el === document.body || el === document.documentElement) return true;
-      if (el.id === "zh-dg-shell" || el.id === "zh-dg-main" || el.id === "root") return true;
+      if (el.id === "zh-dg-shell" || el.id === "zh-dg-layout" || el.id === "zh-dg-main" || el.id === "root") return true;
       if (el.closest?.("#zh-dg-grid, #zh-dg-main")) return true;
       if (isProtectedOverlayEl(el)) return true;
       const t = (el.textContent || "").replace(/\s+/g, "");
@@ -1731,6 +1785,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     try {
       syncOverlayOpenClass();
       tuneModalOverlay();
+      purgeStraySidebars(document.getElementById("zh-dg-scraper"));
       document.querySelectorAll(OVERLAY_ROOT_SEL).forEach(paintOverlaySurfaces);
     } catch (_) {}
   }
@@ -2513,14 +2568,15 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     const all = [...document.querySelectorAll("#zh-dg-side")];
     let side = all[0] || null;
     all.slice(1).forEach((el) => el.remove());
+    const layout = ensureLayout();
     if (!side) {
       side = document.createElement("aside");
       side.id = "zh-dg-side";
       side.innerHTML = sidePanelHTML();
-      document.body.appendChild(side);
+      layout.appendChild(side);
       loadHotList();
-    } else if (side.parentElement !== document.body) {
-      document.body.appendChild(side);
+    } else if (side.parentElement !== layout) {
+      layout.appendChild(side);
     }
     if (!side.querySelector("#zh-dg-hotlist")) {
       side.innerHTML = sidePanelHTML();
@@ -2543,6 +2599,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     if (document.getElementById("zh-dg-shell")) {
       // 去掉与顶栏重复的「快捷入口」
       document.getElementById("zh-dg-loading")?.remove();
+      ensureLayout();
       ensureSidePanel();
       document.querySelectorAll("#zh-dg-side .zh-dg-widget").forEach((w) => {
         const h = w.querySelector("h3");
@@ -2557,6 +2614,8 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     }
     document.body.classList.add("zh-dg-v2");
 
+    const layout = document.createElement("div");
+    layout.id = "zh-dg-layout";
     const shell = document.createElement("div");
     shell.id = "zh-dg-shell";
     shell.innerHTML = `<div id="zh-dg-main">
@@ -2564,9 +2623,10 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       <div id="zh-dg-grid"></div>
       <div id="zh-dg-sentinel"></div>
     </div>`;
+    layout.appendChild(shell);
 
     const host = document.querySelector(".App-main") || document.body;
-    host.prepend(shell);
+    host.prepend(layout);
     ensureSidePanel();
     ensureScraper();
     bindCardEvents(shell);
@@ -3150,6 +3210,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
 
     // 直接丢掉藏起的信息流 DOM，不要塞回 App-main（否则消息/个人页 React 会冲突错乱）
     document.getElementById("zh-dg-scraper")?.remove();
+    document.getElementById("zh-dg-layout")?.remove();
     document.getElementById("zh-dg-shell")?.remove();
     document.getElementById("zh-dg-side")?.remove();
 
