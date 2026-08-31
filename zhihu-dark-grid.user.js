@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.7
-// @description  信息流与侧栏 flex 强分离；修复评论浮层打开时侧栏交叠
+// @version      3.5.8
+// @description  嵌套评论/返回评论抽屉统一暗色主题
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -659,23 +659,68 @@ body.zh-dg-v2 .Modal-wrapper [class*="CommentBox"],
 body.zh-dg-v2 [role="dialog"] .Card,
 body.zh-dg-v2 [role="dialog"] [class*="CommentItem"],
 body.zh-dg-v2 [role="dialog"] [class*="NestComment"],
-body.zh-dg-v2 [role="dialog"] [class*="CommentsV2"]{
+body.zh-dg-v2 [role="dialog"] [class*="CommentsV2"],
+body.zh-dg-v2 body > .Popover:has(.CommentTopbar) .Card,
+body.zh-dg-v2 body > .Popover:has([class*="CommentTopbar"]) .Card,
+body.zh-dg-v2 body > .Popover:has(.CommentTopbar) [class*="CommentItem"],
+body.zh-dg-v2 body > .Popover:has([class*="CommentTopbar"]) [class*="CommentItem"],
+body.zh-dg-v2 body > .Popover:has(.CommentTopbar) [class*="CommentsV2"],
+body.zh-dg-v2 body > div:has(> .CommentTopbar) .CommentItemV2,
+body.zh-dg-v2 body > div:has(> .CommentTopbar) [class*="CommentItem"],
+body.zh-dg-v2 body > div:has(> [class*="CommentTopbar"]) .CommentItemV2,
+body.zh-dg-v2 body > div:has(> [class*="CommentTopbar"]) [class*="CommentItem"]{
   background:var(--dg-overlay)!important;color:var(--dg-text)!important;
   border-color:rgba(255,255,255,.06)!important;box-shadow:none!important
+}
+/* 嵌套评论抽屉（「返回评论」）— 不一定在 Modal-wrapper 内 */
+body.zh-dg-v2 [role="dialog"]:has(.CommentTopbar),
+body.zh-dg-v2 [role="dialog"]:has([class*="CommentTopbar"]),
+body.zh-dg-v2 body > .Popover:has(.CommentTopbar),
+body.zh-dg-v2 body > .Popover:has([class*="CommentTopbar"]),
+body.zh-dg-v2 body > div:has(> .CommentTopbar):not(#zh-dg-layout):not(#zh-dg-shell):not(#zh-dg-scraper),
+body.zh-dg-v2 body > div:has(> [class*="CommentTopbar"]):not(#zh-dg-layout):not(#zh-dg-shell):not(#zh-dg-scraper){
+  background:rgba(0,0,0,.78)!important
+}
+body.zh-dg-v2 body > .Popover:has(.CommentTopbar) .Popover-content,
+body.zh-dg-v2 body > .Popover:has([class*="CommentTopbar"]) .Popover-content,
+body.zh-dg-v2 [role="dialog"]:has(.CommentTopbar),
+body.zh-dg-v2 [role="dialog"]:has([class*="CommentTopbar"]),
+body.zh-dg-v2 body > div:has(> .CommentTopbar):not(#zh-dg-layout) > div:has(.CommentTopbar),
+body.zh-dg-v2 body > div:has(> [class*="CommentTopbar"]):not(#zh-dg-layout) > div:has([class*="CommentTopbar"]){
+  background:var(--dg-overlay)!important;color:var(--dg-text)!important;
+  border:1px solid var(--dg-overlay-line)!important;
+  border-radius:12px!important;overflow:hidden!important;
+  box-shadow:0 20px 56px rgba(0,0,0,.72)!important
+}
+body.zh-dg-v2 .CommentsV2,
+body.zh-dg-v2 [class*="CommentsV2"],
+body.zh-dg-v2 [class*="CommentList"],
+body.zh-dg-v2 [class*="CommentScroller"],
+body.zh-dg-v2 [class*="CommentBox"],
+body.zh-dg-v2 [class*="NestComment"]{
+  background:var(--dg-overlay)!important;color:var(--dg-text)!important
 }
 body.zh-dg-v2 .Modal-wrapper .CommentItemV2-meta,
 body.zh-dg-v2 .Modal-wrapper [class*="CommentItem"] [class*="meta"],
 body.zh-dg-v2 .Modal-wrapper .CommentItemV2-time,
 body.zh-dg-v2 .Modal-wrapper .CommentItemV2-reply,
-body.zh-dg-v2 .Modal-wrapper [class*="CommentItem"] button{
+body.zh-dg-v2 .Modal-wrapper [class*="CommentItem"] button,
+body.zh-dg-v2 [role="dialog"] [class*="CommentItem"] [class*="meta"],
+body.zh-dg-v2 [role="dialog"] [class*="CommentItem"] button,
+body.zh-dg-v2 body > .Popover [class*="CommentItem"] [class*="meta"],
+body.zh-dg-v2 body > .Popover [class*="CommentItem"] button{
   color:var(--dg-mute)!important
 }
 body.zh-dg-v2 .Modal-wrapper a,
-body.zh-dg-v2 [role="dialog"] a{
+body.zh-dg-v2 [role="dialog"] a,
+body.zh-dg-v2 body > .Popover:has(.CommentTopbar) a,
+body.zh-dg-v2 body > .Popover:has([class*="CommentTopbar"]) a{
   color:var(--dg-overlay-link)!important
 }
 body.zh-dg-v2 .Modal-wrapper a:hover,
-body.zh-dg-v2 [role="dialog"] a:hover{
+body.zh-dg-v2 [role="dialog"] a:hover,
+body.zh-dg-v2 body > .Popover:has(.CommentTopbar) a:hover,
+body.zh-dg-v2 body > .Popover:has([class*="CommentTopbar"]) a:hover{
   color:var(--dg-overlay-link-hover)!important
 }
 body.zh-dg-v2 .Modal-wrapper .AuthorInfo-name,
@@ -697,6 +742,9 @@ body.zh-dg-v2 [role="dialog"] input{
 body.zh-dg-v2 .Modal-wrapper .zh-dg-painted,
 body.zh-dg-v2 [class*="Modal-wrapper"] .zh-dg-painted,
 body.zh-dg-v2 [role="dialog"] .zh-dg-painted,
+body.zh-dg-v2 body > .Popover .zh-dg-painted,
+body.zh-dg-v2 body > div:has(.CommentTopbar) .zh-dg-painted,
+body.zh-dg-v2 body > div:has([class*="CommentTopbar"]) .zh-dg-painted,
 body.zh-dg-v2 .Popover-content .zh-dg-painted,
 body.zh-dg-v2 [class*="PushNotifications"] .zh-dg-painted,
 body.zh-dg-v2 [class*="NotificationList"] .zh-dg-painted{
@@ -1613,7 +1661,8 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     const { r, g, b } = rgb;
     // 近白 / 浅灰底
     if (r >= 232 && g >= 232 && b >= 232) return true;
-    if (r >= 200 && g >= 200 && b >= 200 && Math.max(r, g, b) - Math.min(r, g, b) <= 18) return true;
+    if (r >= 248 && g >= 248 && b >= 248) return true;
+    if (r >= 190 && g >= 190 && b >= 190 && Math.max(r, g, b) - Math.min(r, g, b) <= 22) return true;
     return false;
   }
 
@@ -1675,6 +1724,57 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       wrapper.style.setProperty("background", "rgba(0,0,0,.78)", "important");
       const panel = findModalPanel(wrapper);
       if (panel) clearModalShellBg(wrapper, panel);
+    });
+  }
+
+  function findCommentOverlayPanels() {
+    const panels = new Set();
+    const topbars = document.querySelectorAll(".CommentTopbar, [class*='CommentTopbar']");
+    topbars.forEach((tb) => {
+      if (tb.closest("#zh-dg-layout, #zh-dg-shell, #zh-dg-scraper")) return;
+      let el = tb.parentElement;
+      while (el && el !== document.body) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 300 && r.height > 240 && r.width < window.innerWidth * 0.96) {
+          panels.add(el);
+          break;
+        }
+        el = el.parentElement;
+      }
+    });
+    return [...panels];
+  }
+
+  function tuneCommentOverlay() {
+    findCommentOverlayPanels().forEach((panel) => {
+      const inModal = panel.closest(".Modal-wrapper, [class*='Modal-wrapper']");
+      if (inModal && isVisibleOverlayEl(inModal)) return;
+      panel.style.setProperty("background", "var(--dg-overlay)", "important");
+      panel.style.setProperty("color", "var(--dg-text)", "important");
+      panel.style.setProperty("border-radius", "12px", "important");
+      panel.style.setProperty("overflow", "hidden", "important");
+      panel.style.setProperty("border", "1px solid rgba(255,255,255,.08)", "important");
+      let p = panel.parentElement;
+      while (p && p !== document.body) {
+        const r = p.getBoundingClientRect();
+        if (r.width > window.innerWidth * 0.82 && r.height > window.innerHeight * 0.45) {
+          p.style.setProperty("background", "rgba(0,0,0,.78)", "important");
+          break;
+        }
+        p = p.parentElement;
+      }
+    });
+    document.querySelectorAll("body > .Popover, body > div > .Popover").forEach((pop) => {
+      if (!pop.querySelector(".CommentTopbar, [class*='CommentTopbar']")) return;
+      if (!isVisibleOverlayEl(pop)) return;
+      pop.style.setProperty("background", "rgba(0,0,0,.78)", "important");
+      const content = pop.querySelector(".Popover-content, [class*='Popover-content']");
+      if (content) {
+        content.style.setProperty("background", "var(--dg-overlay)", "important");
+        content.style.setProperty("color", "var(--dg-text)", "important");
+        content.style.setProperty("border-radius", "12px", "important");
+        content.style.setProperty("overflow", "hidden", "important");
+      }
     });
   }
 
@@ -1785,8 +1885,10 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     try {
       syncOverlayOpenClass();
       tuneModalOverlay();
+      tuneCommentOverlay();
       purgeStraySidebars(document.getElementById("zh-dg-scraper"));
       document.querySelectorAll(OVERLAY_ROOT_SEL).forEach(paintOverlaySurfaces);
+      findCommentOverlayPanels().forEach(paintOverlaySurfaces);
     } catch (_) {}
   }
 
