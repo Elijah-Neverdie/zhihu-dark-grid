@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Grid Shared Core
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      1.0.0
+// @version      1.0.1
 // @description  知乎 / Quora 暗色网格子插件共享布局、样式与工具库（由站点脚本 @require 加载）
 // @author       Elijah-Neverdie
 // @grant        GM_addStyle
@@ -10,7 +10,7 @@
 (function (global) {
   "use strict";
 
-  const VERSION = "1.0.0";
+  const VERSION = "1.0.1";
   const COL_W = 280;
   const COL_GAP = 14;
   const IMG_SAT_KEY = "zh-dg-img-sat";
@@ -580,7 +580,7 @@ body.zh-dg-v2.zh-dg-overlay-open #zh-dg-layout *{pointer-events:none}
     return io;
   }
 
-  global.DarkGridShared = {
+  const api = {
     VERSION,
     CSS_CORE,
     ICO,
@@ -600,4 +600,13 @@ body.zh-dg-v2.zh-dg-overlay-open #zh-dg-layout *{pointer-events:none}
     createRouteWatcher,
     bindInfiniteScroll,
   };
-})(typeof unsafeWindow !== "undefined" ? unsafeWindow : window);
+
+  // @require 子脚本与主脚本共享沙箱 globalThis；勿只挂 unsafeWindow（主脚本读 window 会拿不到）
+  const g = typeof globalThis !== "undefined" ? globalThis : window;
+  g.DarkGridShared = api;
+  if (typeof unsafeWindow !== "undefined" && unsafeWindow !== g) {
+    try {
+      unsafeWindow.DarkGridShared = api;
+    } catch (_) {}
+  }
+})(typeof globalThis !== "undefined" ? globalThis : window);
