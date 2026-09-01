@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Grid Shared Core
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      1.0.1
+// @version      1.0.2
 // @description  知乎 / Quora 暗色网格子插件共享布局、样式与工具库（由站点脚本 @require 加载）
 // @author       Elijah-Neverdie
 // @grant        GM_addStyle
@@ -10,7 +10,7 @@
 (function (global) {
   "use strict";
 
-  const VERSION = "1.0.1";
+  const VERSION = "1.0.2";
   const COL_W = 280;
   const COL_GAP = 14;
   const IMG_SAT_KEY = "zh-dg-img-sat";
@@ -475,7 +475,7 @@ body.zh-dg-v2.zh-dg-overlay-open #zh-dg-layout *{pointer-events:none}
     function teardown() {
       document.getElementById("zh-dg-layout")?.remove();
       document.getElementById("zh-dg-scraper")?.remove();
-      document.body?.classList.remove("zh-dg-v2", "zh-dg-hide-imgs", "zh-dg-overlay-open");
+      document.body?.classList.remove("zh-dg-v2", "zh-dg-hide-imgs", "zh-dg-overlay-open", "zh-dg-native-view");
       document.documentElement.style.removeProperty("--dg-side-top");
       document.body?.style.removeProperty("--dg-side-top");
     }
@@ -521,6 +521,26 @@ body.zh-dg-v2.zh-dg-overlay-open #zh-dg-layout *{pointer-events:none}
         const sat = getImgSat();
         const satHint = sat === 1 ? "" : sat === 0.5 ? " · 半饱和" : " · 灰度";
         setStatus(on ? "已隐藏图片（再按 Q 显示）" + satHint : "已显示图片" + satHint);
+      },
+      true
+    );
+  }
+
+  function bindNativeViewKey(isActive, setStatus) {
+    window.addEventListener(
+      "keydown",
+      (ev) => {
+        if (!isActive()) return;
+        if (ev.key !== "w" && ev.key !== "W") return;
+        if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.shiftKey) return;
+        const t = ev.target;
+        if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/i.test(t.tagName))) return;
+        ev.preventDefault();
+        document.body.classList.toggle("zh-dg-native-view");
+        const on = document.body.classList.contains("zh-dg-native-view");
+        if (setStatus) {
+          setStatus(on ? "原站 UI（再按 W 返回 Dark Grid）" : "Dark Grid UI（W 切换原站对比）");
+        }
       },
       true
     );
@@ -597,6 +617,7 @@ body.zh-dg-v2.zh-dg-overlay-open #zh-dg-layout *{pointer-events:none}
     applyImgSat,
     cycleImgSat,
     bindImageKeys,
+    bindNativeViewKey,
     createRouteWatcher,
     bindInfiniteScroll,
   };
