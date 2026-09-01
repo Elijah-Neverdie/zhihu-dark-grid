@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Quora 暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      1.0.2
-// @description  Quora 首页暗色多列瀑布流；GraphQL 拦截 + 滚动泵送加速加载
+// @version      1.0.3
+// @description  Quora 首页暗色多列瀑布流；W 切换原站对比；GraphQL 拦截加速加载
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -31,7 +31,7 @@
     return;
   }
 
-  const { esc, text, injectCss, createGridEngine, createShell, applyImgSat, getImgSat, bindImageKeys, createRouteWatcher, bindInfiniteScroll } = DG;
+  const { esc, text, injectCss, createGridEngine, createShell, applyImgSat, getImgSat, bindImageKeys, bindNativeViewKey, createRouteWatcher, bindInfiniteScroll } = DG;
 
   const QUORA_CSS = `
 body.zh-dg-v2{background:#141414!important;color:#e8e8e8!important}
@@ -73,6 +73,40 @@ body.zh-dg-v2 #zh-dg-scraper.zh-dg-scraper-live{
   overflow:auto!important;opacity:0.02!important;z-index:2!important;pointer-events:none!important;contain:none!important
 }
 body.zh-dg-v2 #zh-dg-scraper.zh-dg-scraper-live *{pointer-events:none!important}
+/* W 键：切换原站 UI 对比 */
+body.zh-dg-v2.zh-dg-native-view{background:revert!important;color:revert!important}
+body.zh-dg-v2.zh-dg-native-view #zh-dg-layout,
+body.zh-dg-v2.zh-dg-native-view #zh-dg-side{display:none!important}
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper{
+  position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto!important;
+  max-height:none!important;overflow:visible!important;opacity:1!important;visibility:visible!important;
+  pointer-events:auto!important;z-index:4!important;margin:0!important;padding:0!important;border:0!important
+}
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper #main_content,
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper #main_content > *,
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper .qu-PageWrapper,
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper [class*="PageWrapper"],
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper [class*="HomePage"],
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper [class*="HomeMain"],
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper [class*="HomeFeed"],
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper [class*="SideBar"],
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper [class*="RightBar"],
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper [class*="LeftRail"],
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper [class*="RightRail"],
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper .pagedlist,
+body.zh-dg-v2.zh-dg-native-view #zh-dg-scraper [class*="pagedlist"]{
+  position:relative!important;left:auto!important;top:auto!important;width:auto!important;height:auto!important;
+  max-height:none!important;overflow:visible!important;opacity:1!important;visibility:visible!important;
+  pointer-events:auto!important;margin:revert!important;padding:revert!important;border:revert!important
+}
+body.zh-dg-v2.zh-dg-native-view header,
+body.zh-dg-v2.zh-dg-native-view [role="banner"]{
+  background:revert!important;border-bottom:revert!important;box-shadow:revert!important;color:revert!important
+}
+body.zh-dg-v2.zh-dg-native-view input,
+body.zh-dg-v2.zh-dg-native-view textarea{
+  background:revert!important;border:revert!important;color:revert!important
+}
 `;
 
   const isHome = () => {
@@ -114,7 +148,7 @@ body.zh-dg-v2 #zh-dg-scraper.zh-dg-scraper-live *{pointer-events:none!important}
         <a class="zh-dg-sbtn ghost" href="https://www.quora.com/answer" target="_blank" rel="noopener">写回答</a>
       </div>
       <div class="zh-dg-widget"><h3>Dark Grid</h3>
-        <p class="zh-dg-hotempty">快捷键 <b>Q</b> 藏图，<b>Shift+Q</b> 饱和度轮转。</p>
+        <p class="zh-dg-hotempty">快捷键 <b>Q</b> 藏图，<b>Shift+Q</b> 饱和度，<b>W</b> 切换原站 UI 对比。</p>
       </div>`;
   }
 
@@ -634,7 +668,7 @@ body.zh-dg-v2 #zh-dg-scraper.zh-dg-scraper-live *{pointer-events:none!important}
     feedState.pumpAttempts = 0;
     injectCss(QUORA_CSS);
     document.body.classList.add("zh-dg-v2");
-    document.body.classList.remove("zh-dg-hide-imgs");
+    document.body.classList.remove("zh-dg-hide-imgs", "zh-dg-native-view");
     applyImgSat(getImgSat());
 
     grid = createGridEngine(feedState, { icons: ["up", "comment", "share", "open"] });
@@ -665,6 +699,7 @@ body.zh-dg-v2 #zh-dg-scraper.zh-dg-scraper-live *{pointer-events:none!important}
     if (!bootUi._bound) {
       bootUi._bound = true;
       bindImageKeys(() => bootActive && isHome(), (msg) => grid.setStatus(msg));
+      bindNativeViewKey(() => bootActive && isHome(), (msg) => grid.setStatus(msg));
       bindInfiniteScroll({ isActive: () => bootActive && isHome(), onNearEnd: loadMore, rootMargin: "2400px 0px" });
 
       window.addEventListener("resize", () => {
