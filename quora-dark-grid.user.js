@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Quora 暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      1.0.1
-// @description  参考知乎暗色网格插件，将 Quora 首页重排为多列瀑布流（共享 Dark Grid 核心）
+// @version      1.0.2
+// @description  Quora 首页暗色多列瀑布流；GraphQL 拦截 + 滚动泵送加速加载
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -11,9 +11,9 @@
 // @match        https://www.quora.com/*
 // @match        https://quora.com/*
 // @require      https://raw.githubusercontent.com/Elijah-Neverdie/zhihu-dark-grid/master/dark-grid-shared.user.js
-// @run-at       document-end
+// @run-at       document-start
+// @inject-into  page
 // @grant        GM_addStyle
-// @grant        unsafeWindow
 // @connect      www.quora.com
 // @connect      quora.com
 // @connect      raw.githubusercontent.com
@@ -24,11 +24,10 @@
 
   const DG =
     (typeof globalThis !== "undefined" && globalThis.DarkGridShared) ||
-    (typeof unsafeWindow !== "undefined" && unsafeWindow.DarkGridShared) ||
     window.DarkGridShared;
 
   if (!DG) {
-    console.error("[quora-dark-grid] DarkGridShared 未加载。请确认已安装且 @require 可访问 GitHub raw。");
+    console.error("[quora-dark-grid] DarkGridShared 未加载");
     return;
   }
 
@@ -48,7 +47,6 @@ body.zh-dg-v2 #zh-dg-layout{
   margin:12px auto 48px!important;padding:0 20px 48px!important;box-sizing:border-box!important;
   opacity:1!important;visibility:visible!important;pointer-events:auto!important
 }
-/* 隐藏原站三栏：左 Spaces / 中 Feed / 右广告 */
 body.zh-dg-v2 #main_content,
 body.zh-dg-v2 #main_content > *,
 body.zh-dg-v2 .qu-PageWrapper,
@@ -63,13 +61,18 @@ body.zh-dg-v2 [class*="RightRail"],
 body.zh-dg-v2 .pagedlist,
 body.zh-dg-v2 [class*="pagedlist"]{
   position:fixed!important;left:-10000px!important;top:0!important;width:1px!important;height:1px!important;
-  max-height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;
-  visibility:hidden!important
+  max-height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;visibility:hidden!important
 }
 body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
   position:fixed!important;left:-10000px!important;top:0!important;width:1px!important;height:1px!important;
   opacity:0!important;pointer-events:none!important;visibility:hidden!important
 }
+/* 泵送加载：临时全视口滚动原站 Feed，触发 Quora 懒加载 */
+body.zh-dg-v2 #zh-dg-scraper.zh-dg-scraper-live{
+  position:fixed!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;
+  overflow:auto!important;opacity:0.02!important;z-index:2!important;pointer-events:none!important;contain:none!important
+}
+body.zh-dg-v2 #zh-dg-scraper.zh-dg-scraper-live *{pointer-events:none!important}
 `;
 
   const isHome = () => {
@@ -89,11 +92,19 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
     return p === "/" || p === "/feed" || p.startsWith("/feed/");
   };
 
-  const feedState = { ended: false, loading: false };
+  const feedState = { ended: false, loading: false, pumpAttempts: 0, gqlHits: 0 };
   const DOM_SEEN = new WeakSet();
   let grid;
   let shell;
   let bootActive = false;
+  let fillChain = Promise.resolve();
+
+  function targetCount() {
+    const w = document.getElementById("zh-dg-grid")?.clientWidth || window.innerWidth - 360;
+    const cols = Math.max(2, Math.floor((w + 14) / (280 + 14)));
+    const rows = Math.max(3, Math.ceil(window.innerHeight / 300) + 2);
+    return cols * rows;
+  }
 
   function sidePanelHTML() {
     return `
@@ -103,13 +114,13 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
         <a class="zh-dg-sbtn ghost" href="https://www.quora.com/answer" target="_blank" rel="noopener">写回答</a>
       </div>
       <div class="zh-dg-widget"><h3>Dark Grid</h3>
-        <p class="zh-dg-hotempty">快捷键 <b>Q</b> 藏图，<b>Shift+Q</b> 饱和度轮转。点击卡片正文展开，标题在新标签打开。</p>
+        <p class="zh-dg-hotempty">快捷键 <b>Q</b> 藏图，<b>Shift+Q</b> 饱和度轮转。</p>
       </div>`;
   }
 
   function parkNative(scraper) {
     if (!scraper) return;
-    const sels = [
+    [
       "#main_content",
       ".qu-PageWrapper",
       '[class*="PageWrapper"]',
@@ -118,8 +129,7 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
       '[class*="pagedlist"]',
       '[class*="HomeMain"]',
       '[class*="HomeFeed"]',
-    ];
-    sels.forEach((sel) => {
+    ].forEach((sel) => {
       document.querySelectorAll(sel).forEach((el) => {
         if (!el || el.closest("#zh-dg-layout, #zh-dg-scraper, #zh-dg-side")) return;
         if (!scraper.contains(el)) {
@@ -163,6 +173,11 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
   }
 
   function pickImage(node) {
+    if (!node) return "";
+    if (typeof node === "string") return /https?:\/\//.test(node) ? node : "";
+    if (node.url && /https?:\/\//.test(node.url)) return node.url;
+    if (node.imageUrl) return node.imageUrl;
+    if (!node.querySelectorAll) return "";
     for (const im of node.querySelectorAll("img")) {
       const src = im.getAttribute("data-src") || im.src || "";
       if (src && !src.startsWith("data:") && !/avatar|icon|emoji|svg|favicon/i.test(src) && (im.naturalWidth || im.width) > 40) {
@@ -172,42 +187,214 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
     return "";
   }
 
+  function gqlPlain(node) {
+    if (!node) return "";
+    if (typeof node === "string") return node.replace(/\s+/g, " ").trim();
+    if (node.legacyPlainText) return String(node.legacyPlainText).trim();
+    if (node.plainText) return String(node.plainText).trim();
+    if (node.text) return gqlPlain(node.text);
+    if (Array.isArray(node.sections)) return node.sections.map(gqlPlain).filter(Boolean).join(" ").trim();
+    if (node.content) return gqlPlain(node.content);
+    if (node.excerpt) return gqlPlain(node.excerpt);
+    return "";
+  }
+
+  function buildItem({ title, href, excerpt, img, votes, id, kind, sourceEl }) {
+    title = String(title || "").trim();
+    href = absQuoraUrl(href || location.href);
+    excerpt = String(excerpt || title || "").trim();
+    if (!title || title.length < 6) return null;
+    if (excerpt.length < 6) excerpt = title;
+    return {
+      key: href + "|" + title + "|" + (id || excerpt.slice(0, 32)),
+      kind: kind || "answer",
+      id: id || "",
+      title,
+      href,
+      img: img || "",
+      excerpt: excerpt.slice(0, 240),
+      votes: Number(votes) || 0,
+      comments: 0,
+      sourceEl: sourceEl || null,
+    };
+  }
+
+  function fromGraphQLNode(node) {
+    if (!node || typeof node !== "object") return null;
+    const q = node.question || node.target?.question || node.story?.question || node.post?.question;
+    const title =
+      q?.title ||
+      node.questionTitle ||
+      node.title ||
+      node.target?.title ||
+      node.story?.title ||
+      gqlPlain(node.question) ||
+      "";
+    if (!title || title.length < 6) return null;
+
+    let href =
+      q?.url ||
+      node.url ||
+      node.permalink ||
+      node.target?.url ||
+      node.story?.url ||
+      "";
+    if (!href && q?.qid) href = `https://www.quora.com/q/${q.qid}`;
+    if (!href && q?.id) href = `https://www.quora.com/q/${q.id}`;
+    if (!href && node.tribeItemUrl) href = node.tribeItemUrl;
+
+    const ans =
+      node.answer ||
+      node.target?.answer ||
+      node.story?.answer ||
+      node.combinedAnswerFeedItem?.answer ||
+      node;
+    let excerpt =
+      gqlPlain(ans?.content) ||
+      gqlPlain(ans?.excerpt) ||
+      gqlPlain(node.content) ||
+      gqlPlain(node.excerpt) ||
+      gqlPlain(node.summary) ||
+      gqlPlain(node.description) ||
+      "";
+    if (!excerpt) excerpt = title;
+
+    const votes =
+      ans?.numUpvotes ??
+      ans?.upvoteCount ??
+      node.numUpvotes ??
+      node.upvoteCount ??
+      node.voteCount ??
+      0;
+
+    const img =
+      pickImage(ans?.thumbnail) ||
+      pickImage(node.thumbnail) ||
+      pickImage(node.image) ||
+      pickImage(node);
+
+    const id = String(ans?.aid || ans?.id || node.id || q?.qid || q?.id || "").trim();
+
+    return buildItem({ title, href, excerpt, img, votes, id, kind: "answer" });
+  }
+
+  function fromGraphQL(data) {
+    const out = [];
+    const seen = new Set();
+    const walk = (node, depth) => {
+      if (!node || depth > 16) return;
+      if (Array.isArray(node)) {
+        node.forEach((v) => walk(v, depth + 1));
+        return;
+      }
+      if (typeof node !== "object") return;
+      const item = fromGraphQLNode(node);
+      if (item && !seen.has(item.key)) {
+        seen.add(item.key);
+        out.push(item);
+      }
+      for (const k of Object.keys(node)) {
+        if (k === "__typename" || k === "viewer") continue;
+        walk(node[k], depth + 1);
+      }
+    };
+    walk(data, 0);
+    return out;
+  }
+
+  function onNetworkJson(data) {
+    if (!bootActive || !grid) return;
+    const items = fromGraphQL(data);
+    if (!items.length) return;
+    feedState.gqlHits += 1;
+    const n = grid.render(items);
+    if (n) grid.layoutCols();
+    maybeFill("gql");
+  }
+
+  function installNetworkHook() {
+    if (installNetworkHook._on) return;
+    installNetworkHook._on = true;
+    const isGql = (url) => /graphql|gql_para|gql-para|gql_POST/i.test(String(url || ""));
+
+    const origFetch = window.fetch;
+    window.fetch = function (...args) {
+      const res = origFetch.apply(this, args);
+      try {
+        const url = args[0]?.url || args[0] || "";
+        if (isGql(url)) {
+          res
+            .then((r) => {
+              if (!r.ok) return;
+              return r
+                .clone()
+                .json()
+                .then(onNetworkJson)
+                .catch(() => {});
+            })
+            .catch(() => {});
+        }
+      } catch (_) {}
+      return res;
+    };
+
+    const xOpen = XMLHttpRequest.prototype.open;
+    const xSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+      this._zhDgUrl = url;
+      return xOpen.call(this, method, url, ...rest);
+    };
+    XMLHttpRequest.prototype.send = function (...args) {
+      this.addEventListener(
+        "load",
+        function () {
+          try {
+            if (!isGql(this._zhDgUrl)) return;
+            onNetworkJson(JSON.parse(this.responseText));
+          } catch (_) {}
+        },
+        { once: true }
+      );
+      return xSend.apply(this, args);
+    };
+  }
+
+  installNetworkHook();
+
   function findFeedRoot() {
     const sc = document.getElementById("zh-dg-scraper");
-    if (sc?.querySelector("a[href], .q-text, [class*='answer']")) return sc;
+    if (sc?.querySelector(".q-text, [class*='answer'], a[href], button")) return sc;
     return (
       document.querySelector("#main_content") ||
       document.querySelector('[class*="pagedlist"]') ||
       document.querySelector('[class*="HomeFeed"]') ||
-      document.querySelector("main") ||
       document.body
     );
   }
 
   function isUpvoteEl(el) {
     const s = ((el.getAttribute("aria-label") || "") + (el.textContent || "")).replace(/\s+/g, " ");
-    return /upvote|Upvote|赞同/i.test(s) && !/downvote|Downvote/i.test(s);
+    return /upvote|Upvote/i.test(s) && !/downvote|Downvote/i.test(s);
   }
 
   function findCardRootFrom(node) {
     let el = node;
-    for (let i = 0; i < 18 && el; i++) {
+    for (let i = 0; i < 20 && el; i++) {
       const r = el.getBoundingClientRect?.();
       const t = text(el);
-      if (r && r.width > 240 && r.height > 100 && t.length > 50) return el;
+      if (r && r.width > 200 && r.height > 60 && t.length > 30) return el;
       el = el.parentElement;
     }
     return node.closest(
-      '[class*="pagedlist_item"], [class*="FeedStory"], [class*="FeedUnit"], div.q-box, article, li'
+      '[class*="pagedlist_item"], [class*="FeedStory"], [class*="FeedUnit"], [class*="Story"], div.q-box, article, li'
     );
   }
 
   function findQuestionLink(cardRoot) {
     if (!cardRoot) return null;
-    const links = [...cardRoot.querySelectorAll('a[href]')];
     let best = null;
     let bestScore = 0;
-    links.forEach((a) => {
+    cardRoot.querySelectorAll("a[href]").forEach((a) => {
       let path = "";
       try {
         path = new URL(a.href, location.origin).pathname;
@@ -216,8 +403,8 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
       }
       if (!isQuestionPath(path)) return;
       const t = text(a);
-      if (t.length < 8) return;
-      const score = t.length + (a.querySelector("h1, h2, h3, strong, span[dir='auto']") ? 20 : 0);
+      if (t.length < 6) return;
+      const score = t.length + (a.matches("h1 a, h2 a, h3 a, strong, span[dir='auto']") ? 25 : 0);
       if (score > bestScore) {
         bestScore = score;
         best = a;
@@ -240,7 +427,7 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
   function parseCard(cardRoot, titleA) {
     if (!cardRoot || !titleA || DOM_SEEN.has(cardRoot)) return null;
     const title = text(titleA);
-    if (!title || title.length < 8) return null;
+    if (!title || title.length < 6) return null;
     let path = "";
     try {
       path = new URL(titleA.href, location.origin).pathname;
@@ -252,25 +439,20 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
         ".q-text, [class*='answer_content'], [class*='qtext'], [class*='rendered_qtext'], .puppeteer_test_answer_content"
       ) || cardRoot.querySelector("span[dir='auto'], p");
     let excerpt = text(excerptEl);
-    if (!excerpt || excerpt === title) {
-      excerpt = text(cardRoot).replace(title, "").slice(0, 240);
-    }
+    if (!excerpt || excerpt === title) excerpt = text(cardRoot).replace(title, "").slice(0, 260);
     excerpt = excerpt.replace(/Continue Reading|Read more|Upvote|Downvote|Comment|Share|Follow|⋯/gi, " ").trim();
-    if (excerpt.length < 10) return null;
+    if (excerpt.length < 6) excerpt = title;
     const href = absQuoraUrl(titleA.href);
     DOM_SEEN.add(cardRoot);
-    return {
-      key: href + "|" + title,
-      kind: "answer",
-      id: path.split("/").filter(Boolean).pop() || "",
+    return buildItem({
       title,
       href,
+      excerpt,
       img: pickImage(cardRoot),
-      excerpt: excerpt.slice(0, 220),
       votes: parseVotes(cardRoot),
-      comments: 0,
+      id: path.split("/").filter(Boolean).pop() || "",
       sourceEl: cardRoot,
-    };
+    });
   }
 
   function fromDom() {
@@ -278,31 +460,29 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
     const out = [];
     const seenKeys = new Set();
 
-    // 策略 1：从 Upvote 按钮向上找卡片（最稳）
-    scope.querySelectorAll("button, [role='button'], .q-click-wrapper, a").forEach((el) => {
+    const push = (item) => {
+      if (item && !seenKeys.has(item.key)) {
+        seenKeys.add(item.key);
+        out.push(item);
+      }
+    };
+
+    scope.querySelectorAll("button, [role='button'], .q-click-wrapper, a, div").forEach((el) => {
       if (!isUpvoteEl(el)) return;
-      const cardRoot = findCardRootFrom(el);
-      const titleA = findQuestionLink(cardRoot);
-      const item = parseCard(cardRoot, titleA);
-      if (item && !seenKeys.has(item.key)) {
-        seenKeys.add(item.key);
-        out.push(item);
-      }
+      push(parseCard(findCardRootFrom(el), findQuestionLink(findCardRootFrom(el))));
     });
 
-    // 策略 2：feed 列表项
-    scope.querySelectorAll('[class*="pagedlist_item"], [class*="FeedStory"], [class*="FeedUnit"]').forEach((cardRoot) => {
-      const titleA = findQuestionLink(cardRoot);
-      const item = parseCard(cardRoot, titleA);
-      if (item && !seenKeys.has(item.key)) {
-        seenKeys.add(item.key);
-        out.push(item);
-      }
+    scope.querySelectorAll('[class*="pagedlist_item"], [class*="FeedStory"], [class*="FeedUnit"], [class*="Story"]').forEach((cardRoot) => {
+      push(parseCard(cardRoot, findQuestionLink(cardRoot)));
     });
 
-    // 策略 3：问题链接兜底
-    if (!out.length) {
-      scope.querySelectorAll('a[href]').forEach((a) => {
+    scope.querySelectorAll(".q-text, [class*='answer_content'], .puppeteer_test_answer_content").forEach((rich) => {
+      const cardRoot = findCardRootFrom(rich);
+      push(parseCard(cardRoot, findQuestionLink(cardRoot)));
+    });
+
+    if (out.length < 4) {
+      scope.querySelectorAll("a[href]").forEach((a) => {
         let path = "";
         try {
           path = new URL(a.href, location.origin).pathname;
@@ -310,12 +490,7 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
           return;
         }
         if (!isQuestionPath(path)) return;
-        const cardRoot = findCardRootFrom(a);
-        const item = parseCard(cardRoot, a);
-        if (item && !seenKeys.has(item.key)) {
-          seenKeys.add(item.key);
-          out.push(item);
-        }
+        push(parseCard(findCardRootFrom(a), a));
       });
     }
 
@@ -359,57 +534,88 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
     });
   }
 
-  function ensureMountedLayout() {
-    let layout = document.getElementById("zh-dg-layout");
-    if (!layout) {
-      shell?.mount();
-      layout = document.getElementById("zh-dg-layout");
-    }
-    if (layout) {
-      const header = document.querySelector("header, [role='banner']");
-      if (header && layout.previousElementSibling !== header) insertLayoutAfterHeader(layout);
-    }
-    return layout;
-  }
-
   function sync() {
     const sc = document.getElementById("zh-dg-scraper") || shell?.ensureScraper?.();
     parkNative(sc);
     const items = fromDom();
-    if (items.length) grid.render(items);
-    else grid.setStatus(`Dark Grid 已启用 · 等待抓取内容…（${items.length} 条）`);
+    const n = items.length ? grid.render(items) : 0;
+    if (!n && grid.rendered.size === 0) {
+      grid.setStatus(`Dark Grid 已启用 · 正在拉取…（GraphQL ${feedState.gqlHits} 次）`);
+    } else {
+      grid.setStatus(`已加载 ${grid.rendered.size} 条 · DOM+${feedState.gqlHits}`);
+    }
     shell?.placeSideBelowHeader?.();
     grid.layoutCols();
+    return grid.rendered.size;
   }
 
-  function triggerNativeScroll() {
-    window.scrollTo(0, document.documentElement.scrollHeight);
+  function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  async function pumpNativeFeed(rounds) {
     const sc = document.getElementById("zh-dg-scraper");
-    if (sc) {
-      sc.style.height = "100vh";
-      sc.style.overflow = "auto";
-      sc.scrollTop = sc.scrollHeight;
-      sc.style.height = "120px";
-      sc.style.overflow = "hidden";
+    if (!sc) return;
+    sc.classList.add("zh-dg-scraper-live");
+    const prev = sc.style.cssText;
+    try {
+      for (let i = 0; i < rounds; i++) {
+        const before = grid.rendered.size;
+        sc.scrollTop = sc.scrollHeight;
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        sc.dispatchEvent(new WheelEvent("wheel", { deltaY: 1200, bubbles: true, cancelable: true }));
+        window.dispatchEvent(new WheelEvent("wheel", { deltaY: 1200, bubbles: true, cancelable: true }));
+        await sleep(280);
+        sync();
+        if (grid.rendered.size >= targetCount()) break;
+        if (grid.rendered.size === before && i >= 3) break;
+      }
+    } finally {
+      sc.classList.remove("zh-dg-scraper-live");
+      sc.style.cssText = prev;
+    }
+  }
+
+  function maybeFill(reason) {
+    if (!bootActive || !isHome()) return;
+    if (grid.rendered.size >= targetCount()) return;
+    if (feedState.pumpAttempts >= 25) return;
+    queueFill(reason);
+  }
+
+  function queueFill(reason) {
+    fillChain = fillChain.then(() => ensureFilled(reason)).catch(() => {});
+  }
+
+  async function ensureFilled(reason) {
+    if (!bootActive || !isHome() || feedState.loading) return;
+    if (grid.rendered.size >= targetCount()) return;
+    feedState.loading = true;
+    feedState.pumpAttempts += 1;
+    grid.setLoading(true);
+    grid.setStatus(`已加载 ${grid.rendered.size} 条 · 正在填充…`);
+    try {
+      sync();
+      await pumpNativeFeed(8);
+      sync();
+    } finally {
+      feedState.loading = false;
+      grid.setLoading(false);
+      grid.setStatus(`已加载 ${grid.rendered.size} 条 · ${reason || "fill"}`);
+    }
+    if (grid.rendered.size < targetCount() && feedState.pumpAttempts < 25) {
+      setTimeout(() => maybeFill("retry"), 500);
     }
   }
 
   function loadMore(reason) {
-    if (feedState.loading) return;
-    feedState.loading = true;
-    grid.setLoading(true);
-    triggerNativeScroll();
-    setTimeout(() => {
-      sync();
-      feedState.loading = false;
-      grid.setLoading(false);
-      grid.setStatus(`已加载 ${grid.rendered.size} 条 · ${reason || ""}`);
-    }, 800);
+    queueFill(reason || "scroll");
   }
 
   function teardownUi() {
     if (!bootActive) return;
     bootActive = false;
+    feedState.pumpAttempts = 0;
     shell?.teardown();
     grid?.reset();
   }
@@ -421,9 +627,11 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
     }
     if (bootActive) {
       sync();
+      maybeFill("resync");
       return true;
     }
     bootActive = true;
+    feedState.pumpAttempts = 0;
     injectCss(QUORA_CSS);
     document.body.classList.add("zh-dg-v2");
     document.body.classList.remove("zh-dg-hide-imgs");
@@ -440,11 +648,13 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
         if (layout) insertLayoutAfterHeader(layout);
         grid.layoutCols();
         sync();
+        queueFill("boot");
       },
     });
 
     shell.mount();
-    ensureMountedLayout();
+    const layout = document.getElementById("zh-dg-layout");
+    if (layout) insertLayoutAfterHeader(layout);
 
     const shellEl = document.getElementById("zh-dg-shell");
     if (shellEl) {
@@ -455,12 +665,17 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
     if (!bootUi._bound) {
       bootUi._bound = true;
       bindImageKeys(() => bootActive && isHome(), (msg) => grid.setStatus(msg));
-      bindInfiniteScroll({ isActive: () => bootActive && isHome(), onNearEnd: loadMore });
+      bindInfiniteScroll({ isActive: () => bootActive && isHome(), onNearEnd: loadMore, rootMargin: "2400px 0px" });
+
       window.addEventListener("resize", () => {
         if (!bootActive || !isHome()) return;
         clearTimeout(bootUi._rt);
-        bootUi._rt = setTimeout(() => grid.layoutCols(), 120);
+        bootUi._rt = setTimeout(() => {
+          grid.layoutCols();
+          maybeFill("resize");
+        }, 120);
       });
+
       const mo = new MutationObserver(() => {
         if (!isHome()) {
           teardownUi();
@@ -468,34 +683,38 @@ body.zh-dg-v2 #root > div:not(:has(#zh-dg-layout)):not(:has(#zh-dg-scraper)){
         }
         if (!bootActive) return;
         clearTimeout(bootUi._mt);
-        bootUi._mt = setTimeout(sync, 250);
+        bootUi._mt = setTimeout(() => {
+          sync();
+          maybeFill("mut");
+        }, 120);
       });
       mo.observe(document.documentElement, { childList: true, subtree: true });
 
-      let n = 0;
-      bootUi._timer = setInterval(() => {
-        if (!bootActive || !isHome()) return;
-        ensureMountedLayout();
-        sync();
-        shell.placeSideBelowHeader();
-        if ([1, 3, 6, 10, 15].includes(n)) loadMore("boot-" + n);
-        n += 1;
-        if (n > 30) {
-          clearInterval(bootUi._timer);
-          bootUi._timer = null;
+      const scMo = () => {
+        const sc = document.getElementById("zh-dg-scraper");
+        if (!sc) {
+          setTimeout(scMo, 300);
+          return;
         }
-      }, 800);
+        const obs = new MutationObserver(() => {
+          if (!bootActive) return;
+          clearTimeout(scMo._t);
+          scMo._t = setTimeout(sync, 80);
+        });
+        obs.observe(sc, { childList: true, subtree: true });
+      };
+      scMo();
     }
 
     sync();
+    queueFill("boot");
     return true;
   }
 
   function tryBoot() {
     if (!isHome()) return;
-    if (bootUi()) return;
-    bootUi._retry = (bootUi._retry || 0) + 1;
-    if (bootUi._retry < 40) setTimeout(tryBoot, 500);
+    if (document.body) bootUi();
+    else bootUi._retry = setTimeout(tryBoot, 200);
   }
 
   createRouteWatcher({ isHome, onEnter: tryBoot, onLeave: teardownUi });
