@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.10
-// @description  浮层灰阶与压暗背景协调；修复高亮回复深底深字不可读
+// @version      3.5.11
+// @description  修复误压暗背景/顶栏变窄；关注与推荐流切换时重置网格
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -44,6 +44,19 @@
     return p === "/" || p === "/follow" || p.startsWith("/follow/");
   };
 
+  const feedKind = () => {
+    const p = location.pathname.replace(/\/+$/, "") || "/";
+    if (p === "/follow" || p.startsWith("/follow/")) return "follow";
+    return "recommend";
+  };
+
+  const feedKindFromUrl = (url) => {
+    const s = String(url || "");
+    if (/topstory\/follow/i.test(s)) return "follow";
+    if (/topstory\/hot/i.test(s)) return "hot";
+    return "recommend";
+  };
+
   const feedState = {
     nextUrl: null,
     sessionToken: null,
@@ -75,6 +88,9 @@
 
   function remember(json, requestUrl) {
     if (!json || typeof json !== "object") return;
+    const urlKind = feedKindFromUrl(requestUrl);
+    const cur = feedKind();
+    if (urlKind !== cur && urlKind !== "hot") return;
     feedState.intercepted += 1;
     if (json.paging?.next) feedState.nextUrl = json.paging.next;
     if (json.paging?.is_end) feedState.ended = true;
@@ -96,7 +112,7 @@
   window.fetch = function (input, init) {
     const url = typeof input === "string" ? input : input && input.url;
     const p = _fetch(input, init);
-    if (url && /api\/v3\/feed\/topstory\/recommend/i.test(String(url))) {
+    if (url && /api\/v3\/feed\/topstory\/(recommend|follow|hot)/i.test(String(url))) {
       p.then((res) => {
         res
           .clone()
@@ -114,7 +130,7 @@
     return _open.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function () {
-    if (this.__zhUrl && /api\/v3\/feed\/topstory\/recommend/i.test(String(this.__zhUrl))) {
+    if (this.__zhUrl && /api\/v3\/feed\/topstory\/(recommend|follow|hot)/i.test(String(this.__zhUrl))) {
       this.addEventListener("load", () => {
         try {
           remember(JSON.parse(this.responseText), String(this.__zhUrl));
@@ -126,7 +142,12 @@
 
   function buildNextUrl() {
     if (feedState.nextUrl) return feedState.nextUrl;
-    const u = new URL("https://www.zhihu.com/api/v3/feed/topstory/recommend");
+    const kind = feedKind();
+    const base =
+      kind === "follow"
+        ? "https://www.zhihu.com/api/v3/feed/topstory/follow"
+        : "https://www.zhihu.com/api/v3/feed/topstory/recommend";
+    const u = new URL(base);
     u.searchParams.set("desktop", "true");
     u.searchParams.set("limit", "10");
     u.searchParams.set("action", "down");
@@ -204,16 +225,27 @@ body.zh-dg-v2{
 }
 body.zh-dg-v2 .AppHeader,body.zh-dg-v2 header[role=banner]{
   background:rgba(20,20,20,.96)!important;border-bottom:1px solid var(--dg-line)!important;box-shadow:none!important;
-  width:100%!important;max-width:none!important;
+  width:100%!important;max-width:none!important;min-height:52px!important;height:auto!important;
+  flex:0 0 auto!important;flex-shrink:0!important;
   position:sticky!important;top:0!important;z-index:10050!important;
   pointer-events:auto!important;isolation:isolate!important;transform:translateZ(0)
 }
 body.zh-dg-v2 .AppHeader-inner,
 body.zh-dg-v2 .AppHeader > div,
 body.zh-dg-v2 header[role=banner] > div{
-  max-width:none!important;width:100%!important;margin:0!important;padding-left:20px!important;padding-right:20px!important;box-sizing:border-box!important;
-  pointer-events:auto!important;position:relative!important;z-index:1!important
+  max-width:none!important;width:100%!important;min-height:52px!important;margin:0!important;
+  padding-left:20px!important;padding-right:20px!important;box-sizing:border-box!important;
+  pointer-events:auto!important;position:relative!important;z-index:1!important;
+  display:flex!important;align-items:center!important;flex-wrap:nowrap!important
 }
+body.zh-dg-v2 .AppHeader [class*="Topstory-tab"],
+body.zh-dg-v2 .AppHeader [class*="Tabs"],
+body.zh-dg-v2 .AppHeader nav,
+body.zh-dg-v2 .AppHeader [role="navigation"]{
+  min-height:32px!important;flex-shrink:0!important;white-space:nowrap!important
+}
+body.zh-dg-v2 .App{min-height:100vh!important;display:flex!important;flex-direction:column!important}
+body.zh-dg-v2 .App-main{flex:1 1 auto!important;min-height:0!important}
 /* 移除左上角「知乎」字样 / Logo（不要误伤带 svg 的其它入口） */
 body.zh-dg-v2 .AppHeader-logo,
 body.zh-dg-v2 a.AppHeader-logoLink,
@@ -949,7 +981,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
 
   const rendered = new Set();
   const orderList = []; // 原始纵向顺序
-  const SEEN = new WeakSet();
+  let SEEN = new WeakSet();
   const store = new Map(); // key -> item meta
   const COL_W = 280;
   const COL_GAP = 14;
@@ -1417,6 +1449,24 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     header.addEventListener(
       "click",
       (ev) => {
+        const tabA = ev.target.closest?.("a[href]");
+        if (tabA && header.contains(tabA)) {
+          const href = tabA.getAttribute("href") || "";
+          if (/\/follow(?:\/|$|\?)/i.test(href) || href === "/" || href === "https://www.zhihu.com/" || href.endsWith("zhihu.com/")) {
+            setTimeout(() => {
+              if (!isHome() || !bootUi._active) return;
+              const kind = feedKind();
+              if (kind !== bootUi._feedKind) {
+                bootUi._feedKind = kind;
+                resetFeedGrid("tab");
+                ensureScraper();
+                sync();
+                loadMore("tab");
+              }
+            }, 350);
+          }
+        }
+
         // 点赞/回复列表在浮层内：完全放行，不要 teardown、不要拦截
         if (
           ev.target.closest?.(
@@ -1913,6 +1963,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
 
   function isVisibleOverlayEl(el) {
     if (!el || el.nodeType !== 1) return false;
+    if (el.closest?.("#zh-dg-scraper, #zh-dg-layout, #zh-dg-shell, #zh-dg-side")) return false;
     let st;
     try {
       st = getComputedStyle(el);
@@ -1921,7 +1972,39 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     }
     if (st.display === "none" || st.visibility === "hidden" || Number(st.opacity) === 0) return false;
     const r = el.getBoundingClientRect();
-    return r.width > 48 && r.height > 48;
+    if (r.width < 48 || r.height < 48) return false;
+    if (r.bottom < 8 || r.top > window.innerHeight - 8) return false;
+    if (r.right < 8 || r.left > window.innerWidth - 8) return false;
+    if (r.left < -200 || r.top < -200) return false;
+    return true;
+  }
+
+  function isOpenPopoverPanel(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (!el.matches?.(".Popover-content, [class*='Popover-content']")) return false;
+    const pop = el.closest(".Popover, [class*='Popover']");
+    if (!pop || pop.closest?.("#zh-dg-scraper")) return false;
+    const trigger = pop.querySelector('[aria-expanded="true"], .is-active, .active');
+    if (!trigger && pop.closest(".AppHeader, header")) {
+      const r = el.getBoundingClientRect();
+      if (r.top < 40 || r.height < 140) return false;
+    }
+    return isVisibleOverlayEl(el);
+  }
+
+  function isOpenModalShell(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (!el.matches?.(".Modal-wrapper, [class*='Modal-wrapper']")) return false;
+    return isVisibleOverlayEl(el);
+  }
+
+  function isOpenDialogPanel(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (!el.matches?.('.Modal-inner, [class*="Modal-inner"], .Modal-content, [class*="Modal-content"], [role="dialog"]')) {
+      return false;
+    }
+    if (el.closest?.("#zh-dg-scraper, .AppHeader")) return false;
+    return isVisibleOverlayEl(el);
   }
 
   function syncOverlayOpenClass() {
@@ -1931,41 +2014,31 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       return;
     }
     let open = false;
-    // 优先：全屏 Modal 遮罩（评论弹层）
-    const wrappers = document.querySelectorAll(".Modal-wrapper, [class*='Modal-wrapper']");
-    for (const el of wrappers) {
-      if (!isVisibleOverlayEl(el)) continue;
-      const r = el.getBoundingClientRect();
-      if (r.width > window.innerWidth * 0.5 && r.height > window.innerHeight * 0.3) {
-        open = true;
-        break;
-      }
-    }
-    if (!open) {
-      const modals = document.querySelectorAll(
-        '.Modal-inner, [class*="Modal-modal"], [class*="Modal-content"], [role="dialog"]'
-      );
-      for (const el of modals) {
-        if (!isVisibleOverlayEl(el)) continue;
+    document.querySelectorAll(".Modal-wrapper, [class*='Modal-wrapper']").forEach((el) => {
+      if (!open && isOpenModalShell(el)) {
         const r = el.getBoundingClientRect();
-        if (r.height > 160 && r.width > 200) {
-          open = true;
-          break;
-        }
+        if (r.width > window.innerWidth * 0.45 && r.height > window.innerHeight * 0.25) open = true;
       }
+    });
+    if (!open) {
+      document.querySelectorAll(
+        '.Modal-inner, [class*="Modal-inner"], .Modal-content, [class*="Modal-content"], [role="dialog"]'
+      ).forEach((el) => {
+        if (!open && isOpenDialogPanel(el)) {
+          const r = el.getBoundingClientRect();
+          if (r.height > 160 && r.width > 200) open = true;
+        }
+      });
     }
     if (!open) {
-      const panels = document.querySelectorAll(
+      document.querySelectorAll(
         '[class*="PushNotifications"], .NotificationList, [class*="NotificationList"], .Popover-content, [class*="Popover-content"]'
-      );
-      for (const el of panels) {
-        if (!isVisibleOverlayEl(el)) continue;
-        const r = el.getBoundingClientRect();
-        if (r.height > 180 && r.width > 240) {
-          open = true;
-          break;
+      ).forEach((el) => {
+        if (!open && isOpenPopoverPanel(el)) {
+          const r = el.getBoundingClientRect();
+          if (r.height > 180 && r.width > 240) open = true;
         }
-      }
+      });
     }
     body.classList.toggle("zh-dg-overlay-open", open);
   }
@@ -2710,7 +2783,28 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
   function setStatus(msg) {
     const el = document.getElementById("zh-dg-status");
     if (!el) return;
-    el.textContent = `${msg} · 拦截${feedState.intercepted} · next=${feedState.nextUrl ? "有" : "无"}`;
+    const tab = feedKind() === "follow" ? "关注" : "推荐";
+    el.textContent = `${msg} · ${tab} · 拦截${feedState.intercepted} · next=${feedState.nextUrl ? "有" : "无"}`;
+  }
+
+  function resetFeedGrid(reason) {
+    rendered.clear();
+    orderList.length = 0;
+    store.clear();
+    colCount = 0;
+    SEEN = new WeakSet();
+    feedState.nextUrl = null;
+    feedState.sessionToken = null;
+    feedState.afterId = null;
+    feedState.page = 1;
+    feedState.ended = false;
+    feedState.loading = false;
+    const gridEl = document.getElementById("zh-dg-grid");
+    if (gridEl) gridEl.innerHTML = "";
+    window.__ZH_DG_COUNT__ = 0;
+    const tab = feedKind() === "follow" ? "关注" : "推荐";
+    setStatus(`切换至${tab}流…${reason ? " · " + reason : ""}`);
+    dbg({ event: "resetFeedGrid", reason, kind: feedKind() });
   }
 
   function setLoading(on) {
@@ -3414,6 +3508,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     store.clear();
     colCount = 0;
     bootUi._active = false;
+    bootUi._feedKind = null;
   }
 
   function sync() {
@@ -3462,16 +3557,25 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     return next;
   }
 
-  function bootUi() {
+  function bootUi(forceRefresh) {
     if (!isHome()) {
       teardownUi();
       return;
     }
+    const kind = feedKind();
     if (bootUi._active) {
-      sync();
+      if (forceRefresh || kind !== bootUi._feedKind) {
+        bootUi._feedKind = kind;
+        resetFeedGrid(forceRefresh ? "route" : "feed");
+        sync();
+        loadMore("switch");
+      } else {
+        sync();
+      }
       return;
     }
     bootUi._active = true;
+    bootUi._feedKind = kind;
     injectCss();
     document.body.classList.remove("zh-dg-hide-imgs");
     applyImgSat(getImgSat());
@@ -3600,19 +3704,22 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     bootUi._mo.observe(document.documentElement, { childList: true, subtree: true });
   }
 
-  // SPA 路由：离开首页立即恢复原站，回到首页再启用
+  // SPA 路由：离开首页立即恢复原站，回到首页再启用；关注/推荐切换时重置网格
   let lastRoute = location.pathname;
+  let lastFeedKind = feedKind();
   function checkRoute() {
     const p = location.pathname;
-    if (p === lastRoute) {
-      // 同路径也校正一次（防止漏卸载）
+    const kind = feedKind();
+    const feedSwitched = kind !== lastFeedKind;
+    if (p === lastRoute && !feedSwitched) {
       if (!isHome() && (document.body?.classList.contains("zh-dg-v2") || document.getElementById("zh-dg-shell"))) {
         teardownUi();
       }
       return;
     }
     lastRoute = p;
-    if (isHome()) bootUi();
+    lastFeedKind = kind;
+    if (isHome()) bootUi(feedSwitched);
     else teardownUi();
   }
   const _pushState = history.pushState.bind(history);
