@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.11
-// @description  修复误压暗背景/顶栏变窄；关注与推荐流切换时重置网格
+// @version      3.5.12
+// @description  修复 Tab 切换误卸载 UI；关注流改接 moments API；隐藏热榜/专栏/圈子
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -52,10 +52,31 @@
 
   const feedKindFromUrl = (url) => {
     const s = String(url || "");
-    if (/topstory\/follow/i.test(s)) return "follow";
+    // 关注页实际走 /api/v3/moments，不是 topstory/follow
+    if (/\/api\/v3\/moments(?:\?|$)/i.test(s) || /topstory\/follow/i.test(s)) return "follow";
     if (/topstory\/hot/i.test(s)) return "hot";
     return "recommend";
   };
+
+  function isFeedApiUrl(url) {
+    const s = String(url || "");
+    if (/\/api\/v3\/moments(?:\?|$)/i.test(s)) return true;
+    return /api\/v3\/feed\/topstory\/(recommend|follow|hot)/i.test(s);
+  }
+
+  function flattenFeedPayload(json) {
+    if (!json || !Array.isArray(json.data)) return [];
+    const out = [];
+    for (const entry of json.data) {
+      if (!entry) continue;
+      if (entry.type === "feed_group" && Array.isArray(entry.list)) {
+        for (const sub of entry.list) if (sub) out.push(sub);
+      } else {
+        out.push(entry);
+      }
+    }
+    return out;
+  }
 
   const feedState = {
     nextUrl: null,
@@ -103,8 +124,9 @@
       if (after != null) feedState.afterId = after;
       if (pn) feedState.page = Number(pn) || feedState.page;
     } catch (_) {}
-    if (Array.isArray(json.data) && json.data.length) {
-      window.dispatchEvent(new CustomEvent("zh-dg-data", { detail: json }));
+    const flat = flattenFeedPayload(json);
+    if (flat.length) {
+      window.dispatchEvent(new CustomEvent("zh-dg-data", { detail: { data: flat, paging: json.paging } }));
     }
   }
 
@@ -112,7 +134,7 @@
   window.fetch = function (input, init) {
     const url = typeof input === "string" ? input : input && input.url;
     const p = _fetch(input, init);
-    if (url && /api\/v3\/feed\/topstory\/(recommend|follow|hot)/i.test(String(url))) {
+    if (url && isFeedApiUrl(url)) {
       p.then((res) => {
         res
           .clone()
@@ -130,7 +152,7 @@
     return _open.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function () {
-    if (this.__zhUrl && /api\/v3\/feed\/topstory\/(recommend|follow|hot)/i.test(String(this.__zhUrl))) {
+    if (this.__zhUrl && isFeedApiUrl(this.__zhUrl)) {
       this.addEventListener("load", () => {
         try {
           remember(JSON.parse(this.responseText), String(this.__zhUrl));
@@ -143,11 +165,13 @@
   function buildNextUrl() {
     if (feedState.nextUrl) return feedState.nextUrl;
     const kind = feedKind();
-    const base =
-      kind === "follow"
-        ? "https://www.zhihu.com/api/v3/feed/topstory/follow"
-        : "https://www.zhihu.com/api/v3/feed/topstory/recommend";
-    const u = new URL(base);
+    if (kind === "follow") {
+      const u = new URL("https://www.zhihu.com/api/v3/moments");
+      u.searchParams.set("desktop", "true");
+      u.searchParams.set("limit", "10");
+      return u.toString();
+    }
+    const u = new URL("https://www.zhihu.com/api/v3/feed/topstory/recommend");
     u.searchParams.set("desktop", "true");
     u.searchParams.set("limit", "10");
     u.searchParams.set("action", "down");
@@ -243,6 +267,16 @@ body.zh-dg-v2 .AppHeader [class*="Tabs"],
 body.zh-dg-v2 .AppHeader nav,
 body.zh-dg-v2 .AppHeader [role="navigation"]{
   min-height:32px!important;flex-shrink:0!important;white-space:nowrap!important
+}
+/* 隐藏不需要的顶栏 Tab：热榜 / 专栏 / 圈子 */
+body.zh-dg-v2 .zh-dg-hide-nav-tab,
+body.zh-dg-v2 .AppHeader a[href="/hot"],
+body.zh-dg-v2 .AppHeader a[href^="/hot/"],
+body.zh-dg-v2 .AppHeader a[href*="column-square"],
+body.zh-dg-v2 .AppHeader a[href*="/ring"],
+body.zh-dg-v2 .AppHeader a[href*="/pub/"]{
+  display:none!important;visibility:hidden!important;pointer-events:none!important;
+  width:0!important;height:0!important;margin:0!important;padding:0!important;overflow:hidden!important
 }
 body.zh-dg-v2 .App{min-height:100vh!important;display:flex!important;flex-direction:column!important}
 body.zh-dg-v2 .App-main{flex:1 1 auto!important;min-height:0!important}
@@ -1055,6 +1089,29 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     ensureColumns(calcColCount());
   }
 
+  function hideUnwantedNavTabs() {
+    const header =
+      document.querySelector(".AppHeader") ||
+      document.querySelector("header[role=banner]") ||
+      document.querySelector("header");
+    if (!header) return;
+    const hideHref = (href) =>
+      /^\/hot(?:\/|$|\?)/.test(href) ||
+      /column-square/.test(href) ||
+      /\/ring(?:\/|$|\?)/.test(href) ||
+      /^\/pub(?:\/|$|\?)/.test(href);
+    header.querySelectorAll("a[href]").forEach((a) => {
+      const href = a.getAttribute("href") || "";
+      const txt = (a.textContent || "").replace(/\s+/g, "").trim();
+      if (hideHref(href) || /^(热榜|专栏|圈子)$/.test(txt)) {
+        a.classList.add("zh-dg-hide-nav-tab");
+        try {
+          a.style.setProperty("display", "none", "important");
+        } catch (_) {}
+      }
+    });
+  }
+
   function hideHeaderLogo() {
     const header =
       document.querySelector(".AppHeader") ||
@@ -1481,10 +1538,9 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
         const info = classifyHeaderEntry(hit);
         if (!info) return;
 
-        // 仅当真正离开首页路由时才卸载；打开下拉浮层时保持网格
-        const path0 = location.pathname;
+        // 仅当真正离开首页路由时才卸载；/ ↔ /follow 切换不算离开
         const maybeTeardown = () => {
-          if (!isHome() || location.pathname !== path0) {
+          if (!isHome()) {
             if (document.body?.classList.contains("zh-dg-v2") || document.getElementById("zh-dg-shell")) {
               teardownUi();
             }
@@ -2129,7 +2185,20 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     let comments = 0;
     let contentHtml = "";
 
-    if (kind === "answer" || t.question) {
+    if (kind === "pin") {
+      kind = "pin";
+      id = t.id;
+      href = t.url || `https://www.zhihu.com/pin/${t.id}`;
+      const pinText = Array.isArray(t.content)
+        ? t.content.map((c) => c?.content || "").filter(Boolean).join("\n")
+        : t.excerpt || t.content_html || "";
+      excerpt = strip(pinText);
+      title = excerpt.slice(0, 80) || "想法";
+      contentHtml = t.content_html || pinText;
+      votes = t.like_count || t.reaction_count || 0;
+      comments = t.comment_count || 0;
+      img = t.images?.[0]?.url || t.images?.[0] || "";
+    } else if (kind === "answer" || t.question) {
       kind = "answer";
       title = t.question?.title || t.title || "";
       href = t.question?.id
@@ -2171,6 +2240,11 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     }
     if (!img && entry.common_card?.cover) img = entry.common_card.cover;
     title = String(title || "").trim();
+    if (!title && entry.action_text) title = String(entry.action_text).trim();
+    if (!title && entry.action_text_tpl && Array.isArray(entry.actors) && entry.actors.length) {
+      const names = entry.actors.map((a) => a?.name || "").filter(Boolean).join("、");
+      title = String(entry.action_text_tpl).replace(/\{\}/g, names).trim();
+    }
     if (!title) return null;
     const key = (href || "") + "|" + title;
     const rel = t.relationship || {};
@@ -2799,6 +2873,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     feedState.page = 1;
     feedState.ended = false;
     feedState.loading = false;
+    feedState.intercepted = 0;
     const gridEl = document.getElementById("zh-dg-grid");
     if (gridEl) gridEl.innerHTML = "";
     window.__ZH_DG_COUNT__ = 0;
@@ -2881,11 +2956,13 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     document.getElementById("zh-dg-guess")?.remove();
     hideHeaderLogo();
     hideZhidaEntry();
+    hideUnwantedNavTabs();
     hideMessageBadge();
     fixHeaderProfileClick();
     ensureHeaderShortcuts();
 
     if (document.getElementById("zh-dg-shell")) {
+      document.body.classList.add("zh-dg-v2");
       // 去掉与顶栏重复的「快捷入口」
       document.getElementById("zh-dg-loading")?.remove();
       ensureLayout();
@@ -3460,7 +3537,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     try {
       const r = await fetchMore();
       if (r.ok && r.json) {
-        render((r.json.data || []).map(fromApi).filter(Boolean));
+        render(flattenFeedPayload(r.json).map(fromApi).filter(Boolean));
       }
       render(fromDom());
       dbg({ event: "loadMore", reason, total: rendered.size });
@@ -3675,6 +3752,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       if (!isHome() || !bootUi._active) return;
       sync();
       hideZhidaEntry();
+      hideUnwantedNavTabs();
       hideMessageBadge();
       fixHeaderProfileClick();
       if ([2, 4, 8].includes(n)) loadMore("boot-" + n);
@@ -3688,6 +3766,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     bootUi._headerTimer = setInterval(() => {
       if (!isHome() || !bootUi._active) return;
       hideZhidaEntry();
+      hideUnwantedNavTabs();
       hideMessageBadge();
       fixHeaderProfileClick();
       ensureHeaderShortcuts();
