@@ -1,6 +1,6 @@
 # 知乎暗色网格油猴脚本
 
-**知乎版本：`3.5.12`** · **Quora 子插件：`1.0.3`** · **共享核心：`1.0.2`**
+**知乎版本：`3.5.13`** · **Quora 子插件：`1.0.3`** · **共享核心：`1.0.2`**
 
 将知乎首页重排为深灰多列瀑布流信息流（类似小红书），支持无限加载、展开全文、评论回复与赞同。
 
@@ -65,6 +65,7 @@ https://raw.githubusercontent.com/Elijah-Neverdie/zhihu-dark-grid/master/quora-d
 
 | 版本 | 说明 |
 |------|------|
+| 3.5.13 | 首页视频想法改为打开 `/pin` / `/zvideo` 原页，避免沉浸式 feed 链接 404 |
 | Quora 1.0.3 | 快捷键 W 切换 Dark Grid / 原站 UI 对比 |
 | Quora 1.0.2 | GraphQL 拦截 + 全视口滚动泵送；`@inject-into page` 加速首屏填充 |
 | Quora 1.0.1 | 修复 @require 共享库未注入沙箱导致脚本静默退出；加强 Quora DOM 抓取 |

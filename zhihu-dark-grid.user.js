@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         知乎暗色网格首页
 // @namespace    https://github.com/Elijah-Neverdie/zhihu-dark-grid
-// @version      3.5.12
-// @description  修复 Tab 切换误卸载 UI；关注流改接 moments API；隐藏热榜/专栏/圈子
+// @version      3.5.13
+// @description  首页视频想法改为打开 /pin 或 /zvideo 原页，避免沉浸式 feed 链接 404
 // @author       Elijah-Neverdie
 // @homepageURL  https://github.com/Elijah-Neverdie/zhihu-dark-grid
 // @supportURL   https://github.com/Elijah-Neverdie/zhihu-dark-grid/issues
@@ -2170,6 +2170,48 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
     return text(d);
   }
 
+  function isImmersionUrl(url) {
+    return /\/video\/immersion\//i.test(String(url || ""));
+  }
+
+  function pickVideoCover(t) {
+    const v = t?.video || t?.zvideo || {};
+    return (
+      v.thumbnail ||
+      v.thumbnail_url ||
+      v.cover_url ||
+      v.cover ||
+      v.playlist?.hd?.thumbnail ||
+      v.playlist?.sd?.thumbnail ||
+      v.playlist?.ld?.thumbnail ||
+      t?.thumbnail_extra_info?.url ||
+      ""
+    );
+  }
+
+  // 信息流里视频想法的 t.url 常是 /video/immersion/feed/{id}?object_type=pin&scene=
+  // 该路由只在首页 SPA 内可用，新标签整页打开会 404。改写为可独立打开的原页。
+  function canonicalizeZhihuHref(kind, id, url) {
+    const raw = String(url || "").trim();
+    let objectType = String(kind || "").toLowerCase();
+    let objectId = id != null && String(id) !== "" ? String(id) : "";
+    try {
+      const u = new URL(raw, "https://www.zhihu.com");
+      const mFeed = u.pathname.match(/\/video\/immersion\/feed\/(\d+)/i);
+      if (mFeed) {
+        if (!objectId) objectId = mFeed[1];
+        const qt = (u.searchParams.get("object_type") || "").toLowerCase();
+        if (!objectType || objectType === "unknown") objectType = qt;
+      }
+    } catch (_) {}
+    if (objectType === "pin" && objectId) return `https://www.zhihu.com/pin/${objectId}`;
+    if ((objectType === "zvideo" || objectType === "video") && objectId) {
+      return `https://www.zhihu.com/zvideo/${objectId}`;
+    }
+    if (isImmersionUrl(raw) && objectId) return `https://www.zhihu.com/pin/${objectId}`;
+    return raw;
+  }
+
   function fromApi(entry) {
     if (!entry || entry.type === "feed_advert") return null;
     const t = entry.target || entry;
@@ -2197,7 +2239,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       contentHtml = t.content_html || pinText;
       votes = t.like_count || t.reaction_count || 0;
       comments = t.comment_count || 0;
-      img = t.images?.[0]?.url || t.images?.[0] || "";
+      img = t.images?.[0]?.url || t.images?.[0] || pickVideoCover(t) || "";
     } else if (kind === "answer" || t.question) {
       kind = "answer";
       title = t.question?.title || t.title || "";
@@ -2224,21 +2266,23 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       excerpt = strip(t.excerpt || "");
       comments = t.answer_count || 0;
       votes = t.follower_count || 0;
-    } else if (kind === "zvideo") {
+    } else if (kind === "zvideo" || kind === "video") {
+      kind = "zvideo";
       title = t.title || "";
       href = t.url || `https://www.zhihu.com/zvideo/${t.id}`;
       excerpt = strip(t.description || t.excerpt || "");
-      img = t.image_url || t.thumbnail || "";
+      img = t.image_url || t.thumbnail || pickVideoCover(t) || "";
       votes = t.voteup_count || 0;
       comments = t.comment_count || 0;
     } else {
       title = t.title || t.question?.title || "";
       href = t.url || "";
       excerpt = strip(t.excerpt || t.content || "");
-      img = t.thumbnail || t.image_url || "";
+      img = t.thumbnail || t.image_url || pickVideoCover(t) || "";
       kind = kind || "unknown";
     }
     if (!img && entry.common_card?.cover) img = entry.common_card.cover;
+    href = canonicalizeZhihuHref(kind, id, href);
     title = String(title || "").trim();
     if (!title && entry.action_text) title = String(entry.action_text).trim();
     if (!title && entry.action_text_tpl && Array.isArray(entry.actors) && entry.actors.length) {
@@ -2275,9 +2319,10 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       const title = text(node.querySelector(".ContentItem-title, h2"));
       if (!title) return;
       const a =
-        node.querySelector(".ContentItem-title a, h2 a, a[href*='/question/'], a[href*='zhuanlan']") ||
-        node.querySelector("a");
-      const href = a?.href || location.href;
+        node.querySelector(
+          ".ContentItem-title a, h2 a, a[href*='/question/'], a[href*='zhuanlan'], a[href*='/pin/'], a[href*='/zvideo/'], a[href*='/video/immersion/']"
+        ) || node.querySelector("a");
+      let href = a?.href || location.href;
       let img = "";
       for (const im of node.querySelectorAll("img")) {
         const src = im.getAttribute("data-actualsrc") || im.src || "";
@@ -2294,6 +2339,8 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       const mAns = href.match(/answer\/(\d+)/);
       const mArt = href.match(/zhuanlan\.zhihu\.com\/p\/(\d+)/) || href.match(/\/p\/(\d+)/);
       const mZv = href.match(/zvideo\/(\d+)/);
+      const mPin = href.match(/\/pin\/(\d+)/);
+      const mImm = href.match(/\/video\/immersion\/feed\/(\d+)/);
       const mQ = href.match(/question\/(\d+)/);
       if (mAns) {
         kind = "answer";
@@ -2304,6 +2351,17 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       } else if (mZv) {
         kind = "zvideo";
         id = mZv[1];
+      } else if (mPin) {
+        kind = "pin";
+        id = mPin[1];
+      } else if (mImm) {
+        id = mImm[1];
+        try {
+          const qt = new URL(href, location.origin).searchParams.get("object_type") || "";
+          kind = qt === "zvideo" || qt === "video" ? "zvideo" : "pin";
+        } catch (_) {
+          kind = "pin";
+        }
       } else if (mQ) {
         kind = "question";
         id = mQ[1];
@@ -2311,6 +2369,7 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       const all = text(node);
       const v = all.match(/([\d.]+ ?万?)?\s*赞同/);
       const c = all.match(/([\d.]+ ?万?)?\s*条?评论/);
+      href = canonicalizeZhihuHref(kind, id, href);
       SEEN.add(node);
       out.push({
         key: href + "|" + title,
@@ -2359,7 +2418,8 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
         const id = String(item.id);
         if (item.kind === "answer" && node.querySelector(`a[href*="/answer/${id}"]`)) return node;
         if (item.kind === "article" && node.querySelector(`a[href*="/p/${id}"]`)) return node;
-        if (item.kind === "zvideo" && node.querySelector(`a[href*="/zvideo/${id}"]`)) return node;
+        if (item.kind === "zvideo" && node.querySelector(`a[href*="/zvideo/${id}"], a[href*="/video/immersion/feed/${id}"]`)) return node;
+        if (item.kind === "pin" && node.querySelector(`a[href*="/pin/${id}"], a[href*="/video/immersion/feed/${id}"]`)) return node;
         if (item.kind === "question" && node.querySelector(`a[href*="/question/${id}"]`)) return node;
       }
       if (item.href) {
@@ -2381,16 +2441,33 @@ body.zh-dg-hide-imgs .zh-dg-skel-media{
       const title = text(node.querySelector(".ContentItem-title, h2"));
       if (!title) return;
       const a =
-        node.querySelector(".ContentItem-title a, h2 a, a[href*='/question/'], a[href*='zhuanlan']") ||
-        node.querySelector("a");
-      const href = a?.href || location.href;
+        node.querySelector(
+          ".ContentItem-title a, h2 a, a[href*='/question/'], a[href*='zhuanlan'], a[href*='/pin/'], a[href*='/zvideo/'], a[href*='/video/immersion/']"
+        ) || node.querySelector("a");
+      const hrefRaw = a?.href || location.href;
+      const mAns = hrefRaw.match(/answer\/(\d+)/);
+      const mArt = hrefRaw.match(/\/p\/(\d+)/);
+      const mZv = hrefRaw.match(/zvideo\/(\d+)/);
+      const mPin = hrefRaw.match(/\/pin\/(\d+)/);
+      const mImm = hrefRaw.match(/\/video\/immersion\/feed\/(\d+)/);
+      const id = (mAns && mAns[1]) || (mArt && mArt[1]) || (mZv && mZv[1]) || (mPin && mPin[1]) || (mImm && mImm[1]);
+      let kindHint = "unknown";
+      if (mAns) kindHint = "answer";
+      else if (mArt) kindHint = "article";
+      else if (mZv) kindHint = "zvideo";
+      else if (mPin) kindHint = "pin";
+      else if (mImm) {
+        try {
+          const qt = new URL(hrefRaw, location.origin).searchParams.get("object_type") || "";
+          kindHint = qt === "zvideo" || qt === "video" ? "zvideo" : "pin";
+        } catch (_) {
+          kindHint = "pin";
+        }
+      }
+      const href = canonicalizeZhihuHref(kindHint, id, hrefRaw);
       const key = href + "|" + title;
       let item = store.get(key);
       if (!item) {
-        const mAns = href.match(/answer\/(\d+)/);
-        const mArt = href.match(/\/p\/(\d+)/);
-        const mZv = href.match(/zvideo\/(\d+)/);
-        const id = (mAns && mAns[1]) || (mArt && mArt[1]) || (mZv && mZv[1]);
         if (id) {
           for (const it of store.values()) {
             if (String(it.id) === id) {
